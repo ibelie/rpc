@@ -7,8 +7,86 @@ package rpc
 import (
 	"bytes"
 	"fmt"
+	"sort"
 
 	"io/ioutil"
+)
+
+var (
+	ENTITY_PKG = map[string]string{
+		"github.com/ibelie/microserver": "",
+		"github.com/ibelie/ruid":        "",
+		"github.com/ibelie/tygo":        "",
+	}
+)
+
+const (
+	ENTITY_CODE = `
+
+type Entity struct {
+	tygo.Tygo
+	ruid.RUID
+	Key        ruid.RUID
+	Type       string
+	cachedSize int
+}
+
+func (e *Entity) MaxFieldNum() int {
+	return 1
+}
+
+func (e *Entity) ByteSize() (size int) {
+	if e != nil {
+		e.cachedSize = tygo.SizeVarint(e.RUID) + tygo.SizeVarint(e.Key) + tygo.SizeVarint(microserver.EntityType(e.Type))
+		size = 1 + tygo.SizeVarint(e.cachedSize) + e.cachedSize
+		e.SetCachedSize(size)
+	}
+	return
+}
+
+func (e *Entity) Serialize(output *tygo.ProtoBuf) {
+	if e != nil {
+		output.WriteBytes(10) // tag: 10 MAKE_TAG(1, WireBytes=2)
+		output.WriteVarint(e.cachedSize)
+		output.WriteVarint(e.RUID)
+		output.WriteVarint(e.Key)
+		output.WriteVarint(microserver.EntityType(e.Type))
+	}
+}
+
+func (e *Entity) Deserialize(input *tygo.ProtoBuf) (err error) {
+	for !input.ExpectEnd() {
+		var tag int
+		var cutoff bool
+		if tag, cutoff, err = input.ReadTag(127); err == nil && cutoff && tag == 10 { // MAKE_TAG(1, WireBytes=2)
+			if x, e := input.ReadBuf(); e == nil {
+				tmpi := &tygo.ProtoBuf{Buffer: x}
+				if x, e := tmpi.ReadVarint(); e == nil {
+					e.RUID = ruid.RUID(x)
+				} else {
+					err = e
+				}
+				if x, e := tmpi.ReadVarint(); e == nil {
+					e.Key = ruid.RUID(x)
+				} else {
+					err = e
+				}
+				if x, e := tmpi.ReadVarint(); e == nil {
+					e.Type = microserver.EntityName(x)
+				} else {
+					err = e
+				}
+			} else {
+				err = e
+			}
+			return
+		} else if err = input.SkipField(tag); err != nil {
+			return
+		}
+	}
+	return
+}
+`
 )
 
 func Entity(path string) {
@@ -21,8 +99,18 @@ func Entity(path string) {
 
 package %s
 `, pkgname)))
-	body.Write([]byte(`
-`))
+	body.Write([]byte(ENTITY_CODE))
+
+	pkgs := ENTITY_PKG
+	var sortedPkg []string
+	for path, _ := range pkgs {
+		sortedPkg = append(sortedPkg, path)
+	}
+	sort.Strings(sortedPkg)
+	for _, path := range sortedPkg {
+		head.Write([]byte(fmt.Sprintf(`
+import %s"%s"`, pkgs[path], path)))
+	}
 
 	head.Write(body.Bytes())
 	ioutil.WriteFile(SRC_PATH+path+"/entity.rpc.go", head.Bytes(), 0666)
