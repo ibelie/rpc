@@ -17,7 +17,7 @@ import (
 
 func Inject(path string, filename string, pkgname string, types []tygo.Type) {
 	for _, t := range types {
-		if object, ok := t.(*tygo.Object); ok && object.Parent.Name == "Entity" {
+		if object, ok := isService(t); ok {
 			object.Parent.Object = &tygo.Object{
 				Name:   "Entity",
 				Parent: &tygo.InstanceType{PkgName: "tygo", PkgPath: tygo.TYGO_PATH, Name: "Tygo"},

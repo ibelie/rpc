@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"sort"
 	"strings"
 
 	"go/ast"
@@ -15,12 +16,12 @@ import (
 	"go/parser"
 	"go/token"
 
-	_ "github.com/ibelie/tygo"
+	"github.com/ibelie/tygo"
 )
 
 type Depend struct {
-	Name string
-	Path string
+	Path     string
+	Services []string
 }
 
 var (
@@ -52,7 +53,7 @@ func Extract(path string) (pkgname string, depends []*Depend) {
 					continue
 				}
 				if strings.TrimSpace(decl.Doc.Text()) != "" {
-					depends = append(depends, Parse(decl.Doc.Text())...)
+					depends = merge(depends, parse(decl.Doc.Text())...)
 				}
 			}
 		}
@@ -60,14 +61,60 @@ func Extract(path string) (pkgname string, depends []*Depend) {
 	return
 }
 
-func Parse(code string) (depends []*Depend) {
+func parse(code string) (depends []*Depend) {
 	code = strings.Split(code, "depends on:")[1]
 	for _, line := range strings.Split(code, "\n") {
 		tokens := strings.Split(line, "from")
 		if len(tokens) != 2 {
 			continue
 		}
-		depends = append(depends, &Depend{Name: strings.TrimSpace(tokens[0]), Path: strings.TrimSpace(tokens[1])})
+		depends = merge(depends, &Depend{
+			Services: []string{strings.TrimSpace(tokens[0])},
+			Path:     strings.TrimSpace(tokens[1]),
+		})
 	}
 	return
+}
+
+func merge(a []*Depend, b ...*Depend) (c []*Depend) {
+	var sorted []string
+	m := make(map[string]map[string]bool)
+	for _, ab := range [][]*Depend{a, b} {
+		for _, x := range ab {
+			if _, ok := m[x.Path]; !ok {
+				m[x.Path] = make(map[string]bool)
+				sorted = append(sorted, x.Path)
+			}
+			for _, y := range x.Services {
+				m[x.Path][y] = true
+			}
+		}
+	}
+	sort.Strings(sorted)
+	for _, p := range sorted {
+		var s []string
+		for x, _ := range m[p] {
+			s = append(s, x)
+		}
+		sort.Strings(s)
+		c = append(c, &Depend{Path: p, Services: s})
+	}
+	return
+}
+
+func update(a map[string]string, b map[string]string) map[string]string {
+	if b == nil {
+		return a
+	} else if a == nil {
+		return b
+	}
+	for k, v := range b {
+		a[k] = v
+	}
+	return a
+}
+
+func isService(t tygo.Type) (*tygo.Object, bool) {
+	object, ok := t.(*tygo.Object)
+	return object, ok && object.Parent.Name == "Entity"
 }

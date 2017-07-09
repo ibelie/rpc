@@ -14,6 +14,5 @@ import (
 func main() {
 	pkg := flag.String("pkg", "", "target package")
 	flag.Parse()
-	rpc.Entity(*pkg)
-	tygo.Extract(*pkg, rpc.Inject)
+	rpc.Entity(*pkg, tygo.Extract(*pkg, rpc.Inject))
 }
