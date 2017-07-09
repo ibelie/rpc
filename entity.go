@@ -14,9 +14,8 @@ import (
 
 var (
 	ENTITY_PKG = map[string]string{
-		"github.com/ibelie/microserver": "",
-		"github.com/ibelie/ruid":        "",
-		"github.com/ibelie/tygo":        "",
+		"github.com/ibelie/ruid": "",
+		"github.com/ibelie/tygo": "",
 	}
 )
 
@@ -26,8 +25,8 @@ const (
 type Entity struct {
 	tygo.Tygo
 	ruid.RUID
-	Key        ruid.RUID
-	Type       string
+	Key  ruid.RUID
+	Type uint64
 	cachedSize int
 }
 
@@ -37,7 +36,7 @@ func (e *Entity) MaxFieldNum() int {
 
 func (e *Entity) ByteSize() (size int) {
 	if e != nil {
-		e.cachedSize = tygo.SizeVarint(e.RUID) + tygo.SizeVarint(e.Key) + tygo.SizeVarint(microserver.EntityType(e.Type))
+		e.cachedSize = tygo.SizeVarint(e.RUID) + tygo.SizeVarint(e.Key) + tygo.SizeVarint(e.Type)
 		size = 1 + tygo.SizeVarint(e.cachedSize) + e.cachedSize
 		e.SetCachedSize(size)
 	}
@@ -50,7 +49,7 @@ func (e *Entity) Serialize(output *tygo.ProtoBuf) {
 		output.WriteVarint(e.cachedSize)
 		output.WriteVarint(e.RUID)
 		output.WriteVarint(e.Key)
-		output.WriteVarint(microserver.EntityType(e.Type))
+		output.WriteVarint(e.Type)
 	}
 }
 
@@ -59,25 +58,19 @@ func (e *Entity) Deserialize(input *tygo.ProtoBuf) (err error) {
 		var tag int
 		var cutoff bool
 		if tag, cutoff, err = input.ReadTag(127); err == nil && cutoff && tag == 10 { // MAKE_TAG(1, WireBytes=2)
-			if x, e := input.ReadBuf(); e == nil {
-				tmpi := &tygo.ProtoBuf{Buffer: x}
-				if x, e := tmpi.ReadVarint(); e == nil {
-					e.RUID = ruid.RUID(x)
-				} else {
-					err = e
+			var buffer []byte
+			if buffer, err = input.ReadBuf(); err == nil {
+				var i, k uint64
+				tmpi := &tygo.ProtoBuf{Buffer: buffer}
+				if i, err = tmpi.ReadVarint(); err != nil {
+					return
+				} else if k, err = tmpi.ReadVarint(); err != nil {
+					return
+				} else if e.Type, err = tmpi.ReadVarint(); err != nil {
+					return
 				}
-				if x, e := tmpi.ReadVarint(); e == nil {
-					e.Key = ruid.RUID(x)
-				} else {
-					err = e
-				}
-				if x, e := tmpi.ReadVarint(); e == nil {
-					e.Type = microserver.EntityName(x)
-				} else {
-					err = e
-				}
-			} else {
-				err = e
+				e.RUID = i
+				e.Key  = k
 			}
 			return
 		} else if err = input.SkipField(tag); err != nil {
