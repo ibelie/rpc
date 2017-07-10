@@ -22,13 +22,20 @@ var (
 )
 
 const (
-	ENTITY_CODE = `
+	SERVER_CODE = `
+type IServer interface {
+	EntityType(string) int
+	EntityName(int) string
+}
 
+var Server IServer
+`
+	ENTITY_CODE = `
 type Entity struct {
 	tygo.Tygo
 	ruid.RUID
 	Key  ruid.RUID
-	Type uint64
+	Type string
 	cachedSize int
 }
 
@@ -38,7 +45,7 @@ func (e *Entity) MaxFieldNum() int {
 
 func (e *Entity) ByteSize() (size int) {
 	if e != nil {
-		e.cachedSize = tygo.SizeVarint(e.RUID) + tygo.SizeVarint(e.Key) + tygo.SizeVarint(e.Type)
+		e.cachedSize = tygo.SizeVarint(e.RUID) + tygo.SizeVarint(e.Key) + tygo.SizeVarint(Server.EntityType(e.Type))
 		size = 1 + tygo.SizeVarint(e.cachedSize) + e.cachedSize
 		e.SetCachedSize(size)
 	}
@@ -51,7 +58,7 @@ func (e *Entity) Serialize(output *tygo.ProtoBuf) {
 		output.WriteVarint(e.cachedSize)
 		output.WriteVarint(e.RUID)
 		output.WriteVarint(e.Key)
-		output.WriteVarint(e.Type)
+		output.WriteVarint(Server.EntityType(e.Type))
 	}
 }
 
@@ -62,17 +69,18 @@ func (e *Entity) Deserialize(input *tygo.ProtoBuf) (err error) {
 		if tag, cutoff, err = input.ReadTag(127); err == nil && cutoff && tag == 10 { // MAKE_TAG(1, WireBytes=2)
 			var buffer []byte
 			if buffer, err = input.ReadBuf(); err == nil {
-				var i, k uint64
+				var i, k, t uint64
 				tmpi := &tygo.ProtoBuf{Buffer: buffer}
 				if i, err = tmpi.ReadVarint(); err != nil {
 					return
 				} else if k, err = tmpi.ReadVarint(); err != nil {
 					return
-				} else if e.Type, err = tmpi.ReadVarint(); err != nil {
+				} else if t, err = tmpi.ReadVarint(); err != nil {
 					return
 				}
 				e.RUID = i
 				e.Key  = k
+				e.Type = Server.EntityName(t)
 			}
 			return
 		} else if err = input.SkipField(tag); err != nil {
@@ -93,6 +101,9 @@ func Entity(path string, types []tygo.Type) {
 
 package %s
 `, pkgname)))
+	body.Write([]byte(`
+`))
+	body.Write([]byte(SERVER_CODE))
 	body.Write([]byte(ENTITY_CODE))
 
 	var services []*tygo.Object
