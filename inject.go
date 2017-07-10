@@ -45,7 +45,7 @@ package %s
 
 	var pkgs map[string]string
 	for _, service := range services {
-		srv_s, srv_p := entityService(service)
+		srv_s, srv_p := injectService(service, true)
 		body.Write([]byte(srv_s))
 		pkgs = update(pkgs, srv_p)
 	}
@@ -62,4 +62,25 @@ import %s"%s"`, pkgs[path], path)))
 
 	head.Write(body.Bytes())
 	ioutil.WriteFile(injectfile, head.Bytes(), 0666)
+}
+
+func injectService(service *tygo.Object, hasLocal bool) (string, map[string]string) {
+	var pkgs map[string]string
+	var methods []string
+	for _, method := range service.Methods {
+		param_s, param_p := tygo.TypeListSerialize(service.Name+"Delegate", method.Name, "param", method.Params)
+		result_s, result_p := tygo.TypeListDeserialize(service.Name+"Delegate", method.Name, "result", method.Params)
+		pkgs = update(pkgs, param_p)
+		pkgs = update(pkgs, result_p)
+		methods = append(methods, param_s)
+		methods = append(methods, result_s)
+	}
+
+	return fmt.Sprintf(`
+type %sDelegate Entity
+
+func (e *Entity) %s() *%sDelegate {
+	return (*%sDelegate)(e)
+}
+%s`, service.Name, service.Name, service.Name, service.Name, strings.Join(methods, "")), pkgs
 }

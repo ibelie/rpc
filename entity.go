@@ -90,7 +90,7 @@ package %s
 				if object, ok := isService(t); ok {
 					if s == object.Name {
 						services = append(services, object)
-						srv_s, srv_p := entityService(object)
+						srv_s, srv_p := injectService(object, false)
 						body.Write([]byte(srv_s))
 						pkgs = update(pkgs, srv_p)
 					}
@@ -121,14 +121,4 @@ func entityMessage(services []*tygo.Object) (string, map[string]string) {
 		fmt.Println("entityMessage", s.Name)
 	}
 	return "", nil
-}
-
-func entityService(service *tygo.Object) (string, map[string]string) {
-	return fmt.Sprintf(`
-type %sProxy Entity
-
-func (e *Entity) %s() *%sProxy {
-	return (*%sProxy)(e)
-}
-`, service.Name, service.Name, service.Name, service.Name), nil
 }
