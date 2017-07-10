@@ -24,8 +24,11 @@ var (
 const (
 	SERVER_CODE = `
 type IServer interface {
-	EntityType(string) int
-	EntityName(int) string
+	EntityByteSize(ruid.RUID, ruid.RUID, string) int
+	EntitySerialize(ruid.RUID, ruid.RUID, string, *tygo.ProtoBuf)
+	EntityDeserialize(*tygo.ProtoBuf) (ruid.RUID, ruid.RUID, string, error)
+	EntityMessage(ruid.RUID, ruid.RUID, string, string, string) error
+	ServiceProcedure(ruid.RUID, ruid.RUID, string, string) (string, error)
 }
 
 var Server IServer
@@ -36,17 +39,11 @@ type Entity struct {
 	ruid.RUID
 	Key  ruid.RUID
 	Type string
-	cachedSize int
-}
-
-func (e *Entity) MaxFieldNum() int {
-	return 1
 }
 
 func (e *Entity) ByteSize() (size int) {
 	if e != nil {
-		e.cachedSize = tygo.SizeVarint(e.RUID) + tygo.SizeVarint(e.Key) + tygo.SizeVarint(Server.EntityType(e.Type))
-		size = 1 + tygo.SizeVarint(e.cachedSize) + e.cachedSize
+		size = Server.EntityByteSize(e.RUID, e.Key, e.Type)
 		e.SetCachedSize(size)
 	}
 	return
@@ -54,39 +51,12 @@ func (e *Entity) ByteSize() (size int) {
 
 func (e *Entity) Serialize(output *tygo.ProtoBuf) {
 	if e != nil {
-		output.WriteBytes(10) // tag: 10 MAKE_TAG(1, WireBytes=2)
-		output.WriteVarint(e.cachedSize)
-		output.WriteVarint(e.RUID)
-		output.WriteVarint(e.Key)
-		output.WriteVarint(Server.EntityType(e.Type))
+		Server.EntitySerialize(e.RUID, e.Key, e.Type, output)
 	}
 }
 
 func (e *Entity) Deserialize(input *tygo.ProtoBuf) (err error) {
-	for !input.ExpectEnd() {
-		var tag int
-		var cutoff bool
-		if tag, cutoff, err = input.ReadTag(127); err == nil && cutoff && tag == 10 { // MAKE_TAG(1, WireBytes=2)
-			var buffer []byte
-			if buffer, err = input.ReadBuf(); err == nil {
-				var i, k, t uint64
-				tmpi := &tygo.ProtoBuf{Buffer: buffer}
-				if i, err = tmpi.ReadVarint(); err != nil {
-					return
-				} else if k, err = tmpi.ReadVarint(); err != nil {
-					return
-				} else if t, err = tmpi.ReadVarint(); err != nil {
-					return
-				}
-				e.RUID = i
-				e.Key  = k
-				e.Type = Server.EntityName(t)
-			}
-			return
-		} else if err = input.SkipField(tag); err != nil {
-			return
-		}
-	}
+	e.RUID, e.Key, e.Type, err = Server.EntityDeserialize(input)
 	return
 }
 `
@@ -154,6 +124,11 @@ func entityMessage(services []*tygo.Object) (string, map[string]string) {
 }
 
 func entityService(service *tygo.Object) (string, map[string]string) {
-	fmt.Println("entityService", service.Name)
-	return "", nil
+	return fmt.Sprintf(`
+type %sProxy Entity
+
+func (e *Entity) %s() *%sProxy {
+	return (*%sProxy)(e)
+}
+`, service.Name, service.Name, service.Name, service.Name), nil
 }

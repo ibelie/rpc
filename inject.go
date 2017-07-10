@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"io/ioutil"
@@ -16,18 +17,19 @@ import (
 )
 
 func Inject(path string, filename string, pkgname string, types []tygo.Type) {
+	var services []*tygo.Object
 	for _, t := range types {
 		if object, ok := isService(t); ok {
+			services = append(services, object)
 			object.Parent.Object = &tygo.Object{
 				Name:   "Entity",
 				Parent: &tygo.InstanceType{PkgName: "tygo", PkgPath: tygo.TYGO_PATH, Name: "Tygo"},
-				Fields: []*tygo.Field{&tygo.Field{}},
 			}
 		}
 	}
 	tygo.Inject(path, filename, pkgname, types)
 	injectfile := SRC_PATH + path + "/" + strings.Replace(filename, ".go", ".rpc.go", 1)
-	if types == nil {
+	if len(services) == 0 {
 		os.Remove(injectfile)
 		return
 	}
@@ -40,6 +42,23 @@ package %s
 `, pkgname)))
 	body.Write([]byte(`
 `))
+
+	var pkgs map[string]string
+	for _, service := range services {
+		srv_s, srv_p := entityService(service)
+		body.Write([]byte(srv_s))
+		pkgs = update(pkgs, srv_p)
+	}
+
+	var sortedPkg []string
+	for path, _ := range pkgs {
+		sortedPkg = append(sortedPkg, path)
+	}
+	sort.Strings(sortedPkg)
+	for _, path := range sortedPkg {
+		head.Write([]byte(fmt.Sprintf(`
+import %s"%s"`, pkgs[path], path)))
+	}
 
 	head.Write(body.Bytes())
 	ioutil.WriteFile(injectfile, head.Bytes(), 0666)
