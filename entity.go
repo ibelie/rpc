@@ -105,6 +105,10 @@ package %s
 		}
 	}
 
+	init_s, init_p := entityInitialize(services)
+	body.Write([]byte(init_s))
+	pkgs = update(pkgs, init_p)
+
 	methodRecord := make(map[string]bool)
 	for _, s := range services {
 		for _, m := range s.Methods {
@@ -132,6 +136,17 @@ import %s"%s"`, pkgs[path], path)))
 
 	head.Write(body.Bytes())
 	ioutil.WriteFile(SRC_PATH+path+"/entity.rpc.go", head.Bytes(), 0666)
+}
+
+func entityInitialize(services []*tygo.Object) (string, map[string]string) {
+	return fmt.Sprintf(`
+func InitializeServer(server IServer) {
+	if Server != nil {
+		return
+	}
+	Server = server%s
+}
+`, ""), nil
 }
 
 func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[string]string) {

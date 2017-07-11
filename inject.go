@@ -83,11 +83,16 @@ type %sService struct {
 
 var _%sService = %sService{services: make(map[ruid.RUID]*%s)}
 
-func (s *%sService) Procedure(index int, param []byte) (result []byte, err error) {
+func %sRegister(server IServer) *%sService {
+	InitializeServer(server)
+	return _%sService
+}
+
+func (s *%sService) Procedure(i ruid.RUID, method int, param []byte) (result []byte, err error) {
 	return
 }
 
-`, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name), LOCAL_PKG
+`, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name), LOCAL_PKG
 }
 
 func injectProcedureCaller(owner string, service string, method *tygo.Method, local string) (string, map[string]string) {
