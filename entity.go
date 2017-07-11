@@ -145,21 +145,44 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 		params_list = append(params_list, fmt.Sprintf("p%d", i))
 		params_declare = append(params_declare, fmt.Sprintf("p%d %s", i, param_s))
 	}
+
 	if len(params_list) > 0 {
 		param = fmt.Sprintf("(*%sDelegate)(nil).Serialize%sParam(%s)",
 			service.Name, method.Name, strings.Join(params_list, ", "))
 	} else {
-		param = ""
+		param = "nil"
 	}
+
+	var result string
 	if len(method.Results) == 1 {
 		result_s, result_p := method.Results[0].Go()
 		pkgs = update(pkgs, result_p)
-		params_declare = append(params_declare, fmt.Sprintf("r chan<- %s", result_s))
+		params_declare = append(params_declare, fmt.Sprintf("rChan chan<- %s", result_s))
+		result = fmt.Sprintf(`
+	if rChan != nil {
+		var err error
+		resultChan := make(chan []byte)
+		go func() {
+			if err = Server.Distribute(e.RUID, e.Key, e.Type, "%s", %s, resultChan); err == nil {
+				for _, result := range resultChan {
+					var r %s
+					r, err = (*%sDelegate)(nil).Deserialize%sResult(result)
+					rChan <- r
+				}
+			}
+			close(rChan)
+		}()
+		return err
+	} else {
+		return Server.Distribute(e.RUID, e.Key, e.Type, "%s", %s, nil)
+	}`, method.Name, param, result_s, service.Name, method.Name, method.Name, param)
+	} else {
+		result = fmt.Sprintf(`
+	return Server.Distribute(e.RUID, e.Key, e.Type, "%s", %s, nil)`, method.Name, param)
 	}
 
 	return fmt.Sprintf(`
 func (e *Entity) %s(%s) error {%s
-	return
 }
-`, method.Name, strings.Join(params_declare, ", "), param), pkgs
+`, method.Name, strings.Join(params_declare, ", "), result), pkgs
 }
