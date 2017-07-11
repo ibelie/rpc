@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
+	"strings"
 
 	"io/ioutil"
 
@@ -28,8 +29,8 @@ type IServer interface {
 	EntityByteSize(ruid.RUID, ruid.RUID, string) int
 	EntitySerialize(ruid.RUID, ruid.RUID, string, *tygo.ProtoBuf)
 	EntityDeserialize(*tygo.ProtoBuf) (ruid.RUID, ruid.RUID, string, error)
-	EntityMessage(ruid.RUID, ruid.RUID, string, string, []byte) error
-	ServiceProcedure(ruid.RUID, ruid.RUID, string, []byte) ([]byte, error)
+	Distribute(ruid.RUID, ruid.RUID, string, string, []byte, chan<- []byte) error
+	Procedure(ruid.RUID, ruid.RUID, string, string, []byte) ([]byte, error)
 }
 
 var Server IServer
@@ -103,9 +104,21 @@ package %s
 			}
 		}
 	}
-	msg_s, msg_p := entityMessage(services)
-	body.Write([]byte(msg_s))
-	pkgs = update(pkgs, msg_p)
+
+	methodRecord := make(map[string]bool)
+	for _, s := range services {
+		for _, m := range s.Methods {
+			if ok, exist := methodRecord[m.Name]; exist && ok {
+				continue
+			} else if len(m.Results) > 1 {
+				continue
+			}
+			method_s, method_p := entityDistribute(s, m)
+			body.Write([]byte(method_s))
+			pkgs = update(pkgs, method_p)
+			methodRecord[m.Name] = true
+		}
+	}
 
 	var sortedPkg []string
 	for path, _ := range pkgs {
@@ -121,9 +134,32 @@ import %s"%s"`, pkgs[path], path)))
 	ioutil.WriteFile(SRC_PATH+path+"/entity.rpc.go", head.Bytes(), 0666)
 }
 
-func entityMessage(services []*tygo.Object) (string, map[string]string) {
-	for _, s := range services {
-		fmt.Println("entityMessage", s.Name)
+func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[string]string) {
+	var pkgs map[string]string
+	var param string
+	var params_list []string
+	var params_declare []string
+	for i, p := range method.Params {
+		param_s, param_p := p.Go()
+		pkgs = update(pkgs, param_p)
+		params_list = append(params_list, fmt.Sprintf("p%d", i))
+		params_declare = append(params_declare, fmt.Sprintf("p%d %s", i, param_s))
 	}
-	return "", nil
+	if len(params_list) > 0 {
+		param = fmt.Sprintf("(*%sDelegate)(nil).Serialize%sParam(%s)",
+			service.Name, method.Name, strings.Join(params_list, ", "))
+	} else {
+		param = ""
+	}
+	if len(method.Results) == 1 {
+		result_s, result_p := method.Results[0].Go()
+		pkgs = update(pkgs, result_p)
+		params_declare = append(params_declare, fmt.Sprintf("r chan<- %s", result_s))
+	}
+
+	return fmt.Sprintf(`
+func (e *Entity) %s(%s) error {%s
+	return
+}
+`, method.Name, strings.Join(params_declare, ", "), param), pkgs
 }

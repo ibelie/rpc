@@ -76,7 +76,7 @@ import %s"%s"`, pkgs[path], path)))
 	ioutil.WriteFile(injectfile, head.Bytes(), 0666)
 }
 
-func injectProcedure(owner string, method *tygo.Method, local string) (string, map[string]string) {
+func injectProcedureCaller(owner string, service string, method *tygo.Method, local string) (string, map[string]string) {
 	var pkgs map[string]string
 	var param string
 	var params_list []string
@@ -110,15 +110,16 @@ func injectProcedure(owner string, method *tygo.Method, local string) (string, m
 		%s = local.%s(%s)`, strings.Join(results_list, ", "), method.Name, strings.Join(params_list, ", "))
 		result_remote = fmt.Sprintf(`
 	var result string
-	if result, err = Server.ServiceProcedure(s.RUID, s.Key, s.Type, %s); err != nil {
+	if result, err = Server.Procedure(s.RUID, s.Key, "%s", "%s", %s); err != nil {
 		return
 	}
-	%s, err = s.Deserialize%sResult(result)`, param, strings.Join(results_list, ", "), method.Name)
+	%s, err = s.Deserialize%sResult(result)`, service, method.Name, param,
+			strings.Join(results_list, ", "), method.Name)
 	} else {
 		result_local = fmt.Sprintf(`
 		local.%s(%s)`, method.Name, strings.Join(params_list, ", "))
 		result_remote = fmt.Sprintf(`
-	_, err = Server.ServiceProcedure(s.RUID, s.Key, s.Type, %s)`, param)
+	_, err = Server.Procedure(s.RUID, s.Key, "%s", "%s", %s)`, service, method.Name, param)
 	}
 
 	var checkLocal string
@@ -131,7 +132,7 @@ func injectProcedure(owner string, method *tygo.Method, local string) (string, m
 	}()
 	if local, exist := %s[s.RUID]; exist {%s
 		return
-	}`, owner, method.Name, local, result_local)
+	}`, service, method.Name, local, result_local)
 		pkgs = update(pkgs, FMT_PKG)
 	}
 
@@ -149,7 +150,7 @@ func injectService(service *tygo.Object, local string) (string, map[string]strin
 	for _, method := range service.Methods {
 		param_s, param_p := tygo.TypeListSerialize(service.Name+"Delegate", method.Name, "param", method.Params)
 		result_s, result_p := tygo.TypeListDeserialize(service.Name+"Delegate", method.Name, "result", method.Results)
-		method_s, method_p := injectProcedure(service.Name+"Delegate", method, local)
+		method_s, method_p := injectProcedureCaller(service.Name+"Delegate", service.Name, method, local)
 		pkgs = update(pkgs, param_p)
 		pkgs = update(pkgs, result_p)
 		pkgs = update(pkgs, method_p)
