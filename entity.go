@@ -96,7 +96,7 @@ package %s
 				if object, ok := isService(t); ok {
 					if s == object.Name {
 						services = append(services, object)
-						srv_s, srv_p := injectService(object, "")
+						srv_s, srv_p := injectServiceCommon(object, "")
 						body.Write([]byte(srv_s))
 						pkgs = update(pkgs, srv_p)
 					}

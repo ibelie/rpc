@@ -52,14 +52,12 @@ package %s
 
 	var pkgs map[string]string
 	for _, service := range services {
-		srv_s, srv_p := injectService(service, service.Name+"Local")
-		body.Write([]byte(fmt.Sprintf(`
-var %sMutex sync.Mutex
-var %sLocal = make(map[ruid.RUID]*%s)
-`, service.Name, service.Name, service.Name)))
-		body.Write([]byte(srv_s))
-		pkgs = update(pkgs, srv_p)
-		pkgs = update(pkgs, LOCAL_PKG)
+		local_m, local_s, local_p := injectServiceLocal(service)
+		common_s, common_p := injectServiceCommon(service, local_m)
+		body.Write([]byte(local_s))
+		body.Write([]byte(common_s))
+		pkgs = update(pkgs, local_p)
+		pkgs = update(pkgs, common_p)
 	}
 
 	var sortedPkg []string
@@ -74,6 +72,22 @@ import %s"%s"`, pkgs[path], path)))
 
 	head.Write(body.Bytes())
 	ioutil.WriteFile(injectfile, head.Bytes(), 0666)
+}
+
+func injectServiceLocal(service *tygo.Object) (string, string, map[string]string) {
+	return fmt.Sprintf("_%sService.services", service.Name), fmt.Sprintf(`
+type %sService struct {
+	mutex    sync.Mutex
+	services map[ruid.RUID]*%s
+}
+
+var _%sService = %sService{services: make(map[ruid.RUID]*%s)}
+
+func (s *%sService) Procedure(index int, param []byte) (result []byte, err error) {
+	return
+}
+
+`, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name), LOCAL_PKG
 }
 
 func injectProcedureCaller(owner string, service string, method *tygo.Method, local string) (string, map[string]string) {
@@ -144,7 +158,7 @@ func (s *%s) %s(%s) (%s) {%s%s
 		checkLocal, result_remote), pkgs
 }
 
-func injectService(service *tygo.Object, local string) (string, map[string]string) {
+func injectServiceCommon(service *tygo.Object, local string) (string, map[string]string) {
 	var pkgs map[string]string
 	var methods []string
 	for _, method := range service.Methods {
@@ -165,5 +179,6 @@ type %sDelegate Entity
 func (e *Entity) %s() *%sDelegate {
 	return (*%sDelegate)(e)
 }
-%s`, service.Name, service.Name, service.Name, service.Name, strings.Join(methods, "")), pkgs
+%s`, service.Name, service.Name, service.Name, service.Name,
+		strings.Join(methods, "")), pkgs
 }
