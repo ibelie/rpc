@@ -83,12 +83,14 @@ type %sService struct {
 
 var _%sService = %sService{services: make(map[ruid.RUID]*%s)}
 
-func %sRegister(server IServer) *%sService {
-	InitializeServer(server)
+func %sRegister(server IServer, symbols map[string]uint64) *%sService {
+	InitializeServer(server, symbols)
 	return _%sService
 }
 
-func (s *%sService) Procedure(i ruid.RUID, method int, param []byte) (result []byte, err error) {
+func (s *%sService) Procedure(i ruid.RUID, method uint64, param []byte) (result []byte, err error) {
+	if method == SYMBOL_CREATE {
+	}
 	return
 }
 
@@ -129,7 +131,7 @@ func injectProcedureCaller(owner string, service string, method *tygo.Method, lo
 		%s = local.%s(%s)`, strings.Join(results_list, ", "), method.Name, strings.Join(params_list, ", "))
 		result_remote = fmt.Sprintf(`
 	var result string
-	if result, err = Server.Procedure(s.RUID, s.Key, "%s", "%s", %s); err != nil {
+	if result, err = Server.Procedure(s.RUID, s.Key, SYMBOL_%s, SYMBOL_%s, %s); err != nil {
 		return
 	}
 	%s, err = s.Deserialize%sResult(result)`, service, method.Name, param,
@@ -138,7 +140,8 @@ func injectProcedureCaller(owner string, service string, method *tygo.Method, lo
 		result_local = fmt.Sprintf(`
 		local.%s(%s)`, method.Name, strings.Join(params_list, ", "))
 		result_remote = fmt.Sprintf(`
-	_, err = Server.Procedure(s.RUID, s.Key, "%s", "%s", %s)`, service, method.Name, param)
+	_, err = Server.Procedure(s.RUID, s.Key, SYMBOL_%s, SYMBOL_%s, %s)`,
+			service, method.Name, param)
 	}
 
 	var checkLocal string

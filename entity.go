@@ -25,31 +25,32 @@ var (
 const (
 	SERVER_CODE = `
 type IServer interface {
-	EntityCreate(ruid.RUID, ruid.RUID, string) error
-	EntityByteSize(ruid.RUID, ruid.RUID, string) int
-	EntitySerialize(ruid.RUID, ruid.RUID, string, *tygo.ProtoBuf)
-	EntityDeserialize(*tygo.ProtoBuf) (ruid.RUID, ruid.RUID, string, error)
-	Distribute(ruid.RUID, ruid.RUID, string, string, []byte, chan<- []byte) error
-	Procedure(ruid.RUID, ruid.RUID, string, string, []byte) ([]byte, error)
+	Distribute(ruid.RUID, ruid.RUID, uint64, uint64, []byte, chan<- []byte) error
+	Procedure(ruid.RUID, ruid.RUID, uint64, uint64, []byte) ([]byte, error)
 }
 
 var Server IServer
+var Symbols map[string]uint64
 `
 	ENTITY_CODE = `
 type Entity struct {
 	tygo.Tygo
 	ruid.RUID
 	Key  ruid.RUID
-	Type string
+	Type uint64
+}
+
+func NewEntity(i ruid.RUID, k ruid.RUID, t string) *Entity {
+	return &Entity{RUID: i, Key: k, Type: Symbols[t]}
 }
 
 func (e *Entity) Create() error {
-	return Server.EntityCreate(e.RUID, e.Key, e.Type)
+	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_CREATE, nil, nil)
 }
 
 func (e *Entity) ByteSize() (size int) {
 	if e != nil {
-		size = Server.EntityByteSize(e.RUID, e.Key, e.Type)
+		size = tygo.SizeVarint(e.RUID) + tygo.SizeVarint(e.Key) + tygo.SizeVarint(e.Type)
 		e.SetCachedSize(size)
 	}
 	return
@@ -57,12 +58,23 @@ func (e *Entity) ByteSize() (size int) {
 
 func (e *Entity) Serialize(output *tygo.ProtoBuf) {
 	if e != nil {
-		Server.EntitySerialize(e.RUID, e.Key, e.Type, output)
+		output.WriteVarint(e.RUID)
+		output.WriteVarint(e.Key)
+		output.WriteVarint(e.Type)
 	}
 }
 
 func (e *Entity) Deserialize(input *tygo.ProtoBuf) (err error) {
-	e.RUID, e.Key, e.Type, err = Server.EntityDeserialize(input)
+	var i, k uint64
+	if i, err = input.ReadVarint(); err != nil {
+		return
+	} else if k, err = input.ReadVarint(); err != nil {
+		return
+	} else if e.Type, err = input.ReadVarint(); err != nil {
+		return
+	}
+	e.RUID = i
+	e.Key = k
 	return
 }
 `
@@ -139,14 +151,42 @@ import %s"%s"`, pkgs[path], path)))
 }
 
 func entityInitialize(services []*tygo.Object) (string, map[string]string) {
-	return fmt.Sprintf(`
-func InitializeServer(server IServer) {
-	if Server != nil {
-		return
+	symbol_set := map[string]bool{"CREATE": true}
+	symbol_declare := []string{`
+	SYMBOL_CREATE uint64`}
+	symbol_initialize := []string{`
+		SYMBOL_CREATE = Symbols["CREATE"]`}
+	for _, service := range services {
+		if ok, exist := symbol_set[service.Name]; !ok || !exist {
+			symbol_declare = append(symbol_declare, fmt.Sprintf(`
+	SYMBOL_%s uint64`, service.Name))
+			symbol_initialize = append(symbol_initialize, fmt.Sprintf(`
+		SYMBOL_%s = Symbols["%s"]`, service.Name, service.Name))
+			symbol_set[service.Name] = true
+		}
+		for _, method := range service.Methods {
+			if ok, exist := symbol_set[method.Name]; !ok || !exist {
+				symbol_declare = append(symbol_declare, fmt.Sprintf(`
+	SYMBOL_%s uint64`, method.Name))
+				symbol_initialize = append(symbol_initialize, fmt.Sprintf(`
+		SYMBOL_%s = Symbols["%s"]`, method.Name, method.Name))
+				symbol_set[method.Name] = true
+			}
+		}
 	}
-	Server = server%s
+	return fmt.Sprintf(`
+var (%s
+)
+
+func InitializeServer(server IServer, symbols map[string]uint64) {
+	if Server == nil {
+		Server = server
+	}
+	if Symbols == nil {
+		Symbols = symbols%s
+	}
 }
-`, ""), nil
+`, strings.Join(symbol_declare, ""), strings.Join(symbol_initialize, "")), nil
 }
 
 func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[string]string) {
@@ -178,7 +218,7 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 		var err error
 		resultChan := make(chan []byte)
 		go func() {
-			if err = Server.Distribute(e.RUID, e.Key, e.Type, "%s", %s, resultChan); err == nil {
+			if err = Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_%s, %s, resultChan); err == nil {
 				for _, result := range resultChan {
 					var r %s
 					r, err = (*%sDelegate)(nil).Deserialize%sResult(result)
@@ -189,11 +229,12 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 		}()
 		return err
 	} else {
-		return Server.Distribute(e.RUID, e.Key, e.Type, "%s", %s, nil)
+		return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_%s, %s, nil)
 	}`, method.Name, param, result_s, service.Name, method.Name, method.Name, param)
 	} else {
 		result = fmt.Sprintf(`
-	return Server.Distribute(e.RUID, e.Key, e.Type, "%s", %s, nil)`, method.Name, param)
+	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_%s, %s, nil)`,
+			method.Name, param)
 	}
 
 	return fmt.Sprintf(`
