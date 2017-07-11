@@ -27,8 +27,8 @@ type IServer interface {
 	EntityByteSize(ruid.RUID, ruid.RUID, string) int
 	EntitySerialize(ruid.RUID, ruid.RUID, string, *tygo.ProtoBuf)
 	EntityDeserialize(*tygo.ProtoBuf) (ruid.RUID, ruid.RUID, string, error)
-	EntityMessage(ruid.RUID, ruid.RUID, string, string, string) error
-	ServiceProcedure(ruid.RUID, ruid.RUID, string, string) (string, error)
+	EntityMessage(ruid.RUID, ruid.RUID, string, string, []byte) error
+	ServiceProcedure(ruid.RUID, ruid.RUID, string, []byte) ([]byte, error)
 }
 
 var Server IServer

@@ -64,16 +64,68 @@ import %s"%s"`, pkgs[path], path)))
 	ioutil.WriteFile(injectfile, head.Bytes(), 0666)
 }
 
+func injectProcedure(owner string, method *tygo.Method, hasLocal bool) (string, map[string]string) {
+	var pkgs map[string]string
+
+	var param string
+	var params_list []string
+	var params_declare []string
+	for i, p := range method.Params {
+		param_s, param_p := p.Go()
+		pkgs = update(pkgs, param_p)
+		params_list = append(params_list, fmt.Sprintf("p%d", i))
+		params_declare = append(params_declare, fmt.Sprintf("p%d %s", i, param_s))
+	}
+	if len(params_list) > 0 {
+		param = fmt.Sprintf("s.Serialize%sParam(%s)", method.Name, strings.Join(params_list, ", "))
+	} else {
+		param = "nil"
+	}
+
+	var result string
+	var results_list []string
+	var results_declare []string
+	for i, r := range method.Results {
+		result_s, result_p := r.Go()
+		pkgs = update(pkgs, result_p)
+		results_list = append(results_list, fmt.Sprintf("r%d", i))
+		results_declare = append(results_declare, fmt.Sprintf("r%d %s", i, result_s))
+	}
+	results_declare = append(results_declare, "err error")
+
+	if len(results_list) > 0 {
+		result = fmt.Sprintf(`
+	var result string
+	if result, err = Server.ServiceProcedure(s.RUID, s.Key, s.Type, %s); err != nil {
+		return
+	}
+	%s, err = s.Deserialize%sResult(result)`, param, strings.Join(results_list, ", "), method.Name)
+	} else {
+		result = fmt.Sprintf(`
+	_, err = Server.ServiceProcedure(s.RUID, s.Key, s.Type, %s)`, param)
+	}
+
+	return fmt.Sprintf(`
+func (s *%s) %s(%s) (%s) {%s
+	return
+}
+`, owner, method.Name, strings.Join(params_declare, ", "), strings.Join(results_declare, ", "),
+		result), pkgs
+}
+
 func injectService(service *tygo.Object, hasLocal bool) (string, map[string]string) {
 	var pkgs map[string]string
 	var methods []string
 	for _, method := range service.Methods {
 		param_s, param_p := tygo.TypeListSerialize(service.Name+"Delegate", method.Name, "param", method.Params)
-		result_s, result_p := tygo.TypeListDeserialize(service.Name+"Delegate", method.Name, "result", method.Params)
+		result_s, result_p := tygo.TypeListDeserialize(service.Name+"Delegate", method.Name, "result", method.Results)
+		method_s, method_p := injectProcedure(service.Name+"Delegate", method, hasLocal)
 		pkgs = update(pkgs, param_p)
 		pkgs = update(pkgs, result_p)
+		pkgs = update(pkgs, method_p)
 		methods = append(methods, param_s)
 		methods = append(methods, result_s)
+		methods = append(methods, method_s)
 	}
 
 	return fmt.Sprintf(`
