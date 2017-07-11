@@ -16,6 +16,13 @@ import (
 	"github.com/ibelie/tygo"
 )
 
+var (
+	LOCAL_PKG = map[string]string{
+		"sync": "",
+		"github.com/ibelie/ruid": "",
+	}
+)
+
 func Inject(path string, filename string, pkgname string, types []tygo.Type) {
 	var services []*tygo.Object
 	for _, t := range types {
@@ -45,9 +52,14 @@ package %s
 
 	var pkgs map[string]string
 	for _, service := range services {
-		srv_s, srv_p := injectService(service, true)
+		srv_s, srv_p := injectService(service, service.Name+"Local")
+		body.Write([]byte(fmt.Sprintf(`
+var %sMutex sync.Mutex
+var %sLocal = make(map[ruid.RUID]*%s)
+`, service.Name, service.Name, service.Name)))
 		body.Write([]byte(srv_s))
 		pkgs = update(pkgs, srv_p)
+		pkgs = update(pkgs, LOCAL_PKG)
 	}
 
 	var sortedPkg []string
@@ -64,9 +76,8 @@ import %s"%s"`, pkgs[path], path)))
 	ioutil.WriteFile(injectfile, head.Bytes(), 0666)
 }
 
-func injectProcedure(owner string, method *tygo.Method, hasLocal bool) (string, map[string]string) {
+func injectProcedure(owner string, method *tygo.Method, local string) (string, map[string]string) {
 	var pkgs map[string]string
-
 	var param string
 	var params_list []string
 	var params_declare []string
@@ -82,7 +93,8 @@ func injectProcedure(owner string, method *tygo.Method, hasLocal bool) (string, 
 		param = "nil"
 	}
 
-	var result string
+	var result_local string
+	var result_remote string
 	var results_list []string
 	var results_declare []string
 	for i, r := range method.Results {
@@ -94,32 +106,50 @@ func injectProcedure(owner string, method *tygo.Method, hasLocal bool) (string, 
 	results_declare = append(results_declare, "err error")
 
 	if len(results_list) > 0 {
-		result = fmt.Sprintf(`
+		result_local = fmt.Sprintf(`
+		%s = local.%s(%s)`, strings.Join(results_list, ", "), method.Name, strings.Join(params_list, ", "))
+		result_remote = fmt.Sprintf(`
 	var result string
 	if result, err = Server.ServiceProcedure(s.RUID, s.Key, s.Type, %s); err != nil {
 		return
 	}
 	%s, err = s.Deserialize%sResult(result)`, param, strings.Join(results_list, ", "), method.Name)
 	} else {
-		result = fmt.Sprintf(`
+		result_local = fmt.Sprintf(`
+		local.%s(%s)`, method.Name, strings.Join(params_list, ", "))
+		result_remote = fmt.Sprintf(`
 	_, err = Server.ServiceProcedure(s.RUID, s.Key, s.Type, %s)`, param)
 	}
 
+	var checkLocal string
+	if local != "" {
+		checkLocal = fmt.Sprintf(`
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("[%s] Procedure %s panic:\n>>>>%%v", e)
+		}
+	}()
+	if local, exist := %s[s.RUID]; exist {%s
+		return
+	}`, owner, method.Name, local, result_local)
+		pkgs = update(pkgs, FMT_PKG)
+	}
+
 	return fmt.Sprintf(`
-func (s *%s) %s(%s) (%s) {%s
+func (s *%s) %s(%s) (%s) {%s%s
 	return
 }
 `, owner, method.Name, strings.Join(params_declare, ", "), strings.Join(results_declare, ", "),
-		result), pkgs
+		checkLocal, result_remote), pkgs
 }
 
-func injectService(service *tygo.Object, hasLocal bool) (string, map[string]string) {
+func injectService(service *tygo.Object, local string) (string, map[string]string) {
 	var pkgs map[string]string
 	var methods []string
 	for _, method := range service.Methods {
 		param_s, param_p := tygo.TypeListSerialize(service.Name+"Delegate", method.Name, "param", method.Params)
 		result_s, result_p := tygo.TypeListDeserialize(service.Name+"Delegate", method.Name, "result", method.Results)
-		method_s, method_p := injectProcedure(service.Name+"Delegate", method, hasLocal)
+		method_s, method_p := injectProcedure(service.Name+"Delegate", method, local)
 		pkgs = update(pkgs, param_p)
 		pkgs = update(pkgs, result_p)
 		pkgs = update(pkgs, method_p)

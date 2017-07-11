@@ -24,6 +24,7 @@ var (
 const (
 	SERVER_CODE = `
 type IServer interface {
+	EntityCreate(ruid.RUID, ruid.RUID, string) error
 	EntityByteSize(ruid.RUID, ruid.RUID, string) int
 	EntitySerialize(ruid.RUID, ruid.RUID, string, *tygo.ProtoBuf)
 	EntityDeserialize(*tygo.ProtoBuf) (ruid.RUID, ruid.RUID, string, error)
@@ -39,6 +40,10 @@ type Entity struct {
 	ruid.RUID
 	Key  ruid.RUID
 	Type string
+}
+
+func (e *Entity) Create() error {
+	return Server.EntityCreate(e.RUID, e.Key, e.Type)
 }
 
 func (e *Entity) ByteSize() (size int) {
@@ -90,7 +95,7 @@ package %s
 				if object, ok := isService(t); ok {
 					if s == object.Name {
 						services = append(services, object)
-						srv_s, srv_p := injectService(object, false)
+						srv_s, srv_p := injectService(object, "")
 						body.Write([]byte(srv_s))
 						pkgs = update(pkgs, srv_p)
 					}

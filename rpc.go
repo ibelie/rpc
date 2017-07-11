@@ -25,6 +25,7 @@ type Depend struct {
 }
 
 var (
+	FMT_PKG  = map[string]string{"fmt": ""}
 	SRC_PATH = os.Getenv("GOPATH") + "/src/"
 	PKG_PATH = reflect.TypeOf(Depend{}).PkgPath()
 )
