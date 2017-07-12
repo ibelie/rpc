@@ -89,7 +89,21 @@ func %sRegister(server IServer, symbols map[string]uint64) *%sService {
 }
 
 func (s *%sService) Procedure(i ruid.RUID, method uint64, param []byte) (result []byte, err error) {
-	if method == SYMBOL_CREATE {
+	switch method {
+	case SYMBOL_CREATE:
+		s.mutex.Lock()
+		defer s.mutex.Unlock()
+		if _, exist := s.services[i]; exist {
+			err = fmt.Errorf("[%s] Service RUID already exists: %%v", i)
+		} else {
+		}
+	case SYMBOL_DESTROY:
+		s.mutex.Lock()
+		defer s.mutex.Unlock()
+		if service, exist := s.services[i]; !exist {
+			err = fmt.Errorf("[%s] Service RUID not exists: %%v", i)
+		} else {
+		}
 	}
 	return
 }

@@ -48,6 +48,10 @@ func (e *Entity) Create() error {
 	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_CREATE, nil, nil)
 }
 
+func (e *Entity) Destroy() error {
+	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_DESTROY, nil, nil)
+}
+
 func (e *Entity) ByteSize() (size int) {
 	if e != nil {
 		size = tygo.SizeVarint(e.RUID) + tygo.SizeVarint(e.Key) + tygo.SizeVarint(e.Type)
@@ -151,11 +155,9 @@ import %s"%s"`, pkgs[path], path)))
 }
 
 func entityInitialize(services []*tygo.Object) (string, map[string]string) {
-	symbol_set := map[string]bool{"CREATE": true}
-	symbol_declare := []string{`
-	SYMBOL_CREATE uint64`}
-	symbol_initialize := []string{`
-		SYMBOL_CREATE = Symbols["CREATE"]`}
+	symbol_set := make(map[string]bool)
+	var symbol_declare []string
+	var symbol_initialize []string
 	for _, service := range services {
 		if ok, exist := symbol_set[service.Name]; !ok || !exist {
 			symbol_declare = append(symbol_declare, fmt.Sprintf(`
@@ -175,6 +177,11 @@ func entityInitialize(services []*tygo.Object) (string, map[string]string) {
 		}
 	}
 	return fmt.Sprintf(`
+const (
+	SYMBOL_CREATE  uint64 = iota
+	SYMBOL_DESTROY
+)
+
 var (%s
 )
 
