@@ -13,6 +13,7 @@ import (
 
 	"go/ast"
 	"go/build"
+	"go/doc"
 	"go/parser"
 	"go/token"
 
@@ -118,4 +119,35 @@ func update(a map[string]string, b map[string]string) map[string]string {
 func isService(t tygo.Type) (*tygo.Object, bool) {
 	object, ok := t.(*tygo.Object)
 	return object, ok && object.Parent.Name == "Entity"
+}
+
+func hasMethod(object *doc.Type, method *tygo.Method) bool {
+	for _, m := range object.Methods {
+		if m.Name == method.Name {
+			return true
+		}
+	}
+	return false
+}
+
+func packageDoc(path string) *doc.Package {
+	p, err := build.Import(path, "", build.ImportComment)
+	if err != nil {
+		return nil
+	}
+	fs := token.NewFileSet()
+	include := func(info os.FileInfo) bool {
+		for _, name := range p.GoFiles {
+			if name == info.Name() {
+				return true
+			}
+		}
+		return false
+	}
+
+	if pkgs, err := parser.ParseDir(fs, p.Dir, include, parser.ParseComments); err != nil || len(pkgs) != 1 {
+		return nil
+	} else {
+		return doc.New(pkgs[p.Name], p.ImportPath, doc.AllDecls)
+	}
 }

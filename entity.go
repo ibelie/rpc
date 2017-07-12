@@ -45,7 +45,11 @@ func NewEntity(i ruid.RUID, k ruid.RUID, t string) *Entity {
 }
 
 func (e *Entity) Create() error {
-	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_CREATE, nil, nil)
+	data := make([]byte, tygo.SizeVarint(e.Key) + tygo.SizeVarint(e.Type))
+	output := &tygo.ProtoBuf{Buffer: data}
+	output.WriteVarint(e.Key)
+	output.WriteVarint(e.Type)
+	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_CREATE, data, nil)
 }
 
 func (e *Entity) Destroy() error {
