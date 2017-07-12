@@ -69,10 +69,13 @@ package %s
 	for _, service := range services {
 		local_m, local_s, local_p := injectServiceLocal(service, objects[service.Name])
 		common_s, common_p := injectServiceCommon(service, local_m)
+		property_s, property_p := injectServiceProperty(service)
 		body.Write([]byte(local_s))
 		body.Write([]byte(common_s))
+		body.Write([]byte(property_s))
 		pkgs = update(pkgs, local_p)
 		pkgs = update(pkgs, common_p)
+		pkgs = update(pkgs, property_p)
 	}
 
 	var sortedPkg []string
@@ -90,8 +93,6 @@ import %s"%s"`, pkgs[path], path)))
 }
 
 func injectProcedureCallee(service *tygo.Object, method *tygo.Method) (string, map[string]string) {
-	pkgs := FMT_PKG
-
 	var param string
 	var params_list []string
 	for i, _ := range method.Params {
@@ -122,7 +123,7 @@ func injectProcedureCallee(service *tygo.Object, method *tygo.Method) (string, m
 		if service, exist := s.services[i]; !exist {
 			err = fmt.Errorf("[%s] Service %s RUID not exists: %%v", i)
 		}%s%s
-		`, method.Name, method.Name, service.Name, method.Name, param, result), pkgs
+		`, method.Name, method.Name, service.Name, method.Name, param, result), FMT_PKG
 }
 
 func injectServiceLocal(service *tygo.Object, object *doc.Type) (string, string, map[string]string) {
@@ -171,6 +172,7 @@ func (s *%sService) Procedure(i ruid.RUID, method uint64, param []byte) (result 
 			err = fmt.Errorf("[%s] Procedure %%d(%%s) %%v panic:\n>>>>%%v", method, methodName, i, e)
 		}
 	}()
+
 	switch method {
 	case SYMBOL_CREATE:
 		methodName = "Create"
@@ -196,14 +198,21 @@ func (s *%sService) Procedure(i ruid.RUID, method uint64, param []byte) (result 
 			err = fmt.Errorf("[%s] Service destroy RUID not exists: %%v", i)
 		} else {%s
 			delete(s.services, i)
+		}
+	case SYMBOL_SYNCHRON:
+		methodName = "Synchron"
+		if service, exist := s.services[i]; !exist {
+			err = fmt.Errorf("[%s] Service synchron RUID not exists: %%v", i)
+		} else {
+			result = make([]byte, service.ByteSize())
+			service.Serialize(&tygo.ProtoBuf{Buffer: result})
 		}%s
 	}
 	return
 }
-
 `, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
 		service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
-		onCreate, serviceTemp, service.Name, onDestroy, strings.Join(cases, "")), pkgs
+		onCreate, serviceTemp, service.Name, onDestroy, service.Name, strings.Join(cases, "")), pkgs
 }
 
 func injectProcedureCaller(owner string, service string, method *tygo.Method, local string) (string, map[string]string) {
@@ -298,4 +307,57 @@ func (e *Entity) %s() *%sDelegate {
 }
 %s`, service.Name, service.Name, service.Name, service.Name,
 		strings.Join(methods, "")), pkgs
+}
+
+func injectServiceProperty(service *tygo.Object) (string, map[string]string) {
+	var pkgs map[string]string
+	var codes []string
+	for _, property := range service.Fields {
+		property_s, property_p := property.Go()
+		serialize_s, serialize_p := tygo.TypeListSerialize(service.Name, property.Name, "",
+			[]tygo.Type{tygo.SimpleType_UINT64, tygo.SimpleType_UINT64, property})
+		pkgs = update(pkgs, property_p)
+		pkgs = update(pkgs, serialize_p)
+		codes = append(codes, serialize_s)
+
+		switch property.Type.(type) {
+		case *tygo.ListType:
+			codes = append(codes, fmt.Sprintf(`
+func (s *%s) extend%s(x %s) error {
+	if x == nil || len(x) <= 0 {
+		return
+	}
+	s.%s = append(s.%s, x...)
+	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_NOTIFY, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x), nil)
+}
+`, service.Name, strings.Title(property.Name), property_s, property.Name, property.Name,
+				property.Name, service.Name, property.Name))
+		case *tygo.DictType:
+			codes = append(codes, fmt.Sprintf(`
+func (s *%s) update%s(x %s) error {
+	if x == nil || len(x) <= 0 {
+		return
+	} else if s.%s == nil {
+		s.%s = make(%s)
+	}
+	for k, v := range x {
+		s.%s[k] = v
+	}
+	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_NOTIFY, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x), nil)
+}
+`, service.Name, strings.Title(property.Name), property_s, property.Name, property.Name,
+				property_s, property.Name, property.Name, service.Name, property.Name))
+		default:
+			codes = append(codes, fmt.Sprintf(`
+func (s *%s) set%s(x %s) error {
+	s.%s = x
+	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_NOTIFY, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x), nil)
+}
+`, service.Name, strings.Title(property.Name), property_s, property.Name, property.Name,
+				service.Name, property.Name))
+		}
+
+	}
+
+	return strings.Join(codes, ""), pkgs
 }

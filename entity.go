@@ -170,6 +170,15 @@ func entityInitialize(services []*tygo.Object) (string, map[string]string) {
 		SYMBOL_%s = Symbols["%s"]`, service.Name, service.Name))
 			symbol_set[service.Name] = true
 		}
+		for _, field := range service.Fields {
+			if ok, exist := symbol_set[field.Name]; !ok || !exist {
+				symbol_declare = append(symbol_declare, fmt.Sprintf(`
+	SYMBOL_%s uint64`, field.Name))
+				symbol_initialize = append(symbol_initialize, fmt.Sprintf(`
+		SYMBOL_%s = Symbols["%s"]`, field.Name, field.Name))
+				symbol_set[field.Name] = true
+			}
+		}
 		for _, method := range service.Methods {
 			if ok, exist := symbol_set[method.Name]; !ok || !exist {
 				symbol_declare = append(symbol_declare, fmt.Sprintf(`
@@ -184,6 +193,8 @@ func entityInitialize(services []*tygo.Object) (string, map[string]string) {
 const (
 	SYMBOL_CREATE  uint64 = iota
 	SYMBOL_DESTROY
+	SYMBOL_SYNCHRON
+	SYMBOL_NOTIFY
 )
 
 var (%s
