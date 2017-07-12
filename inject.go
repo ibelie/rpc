@@ -18,7 +18,9 @@ import (
 )
 
 var (
+	FMT_PKG   = map[string]string{"fmt": ""}
 	LOCAL_PKG = map[string]string{
+		"fmt":  "",
 		"sync": "",
 		"github.com/ibelie/ruid": "",
 		"github.com/ibelie/tygo": "",
@@ -87,6 +89,42 @@ import %s"%s"`, pkgs[path], path)))
 	ioutil.WriteFile(injectfile, head.Bytes(), 0666)
 }
 
+func injectProcedureCallee(service *tygo.Object, method *tygo.Method) (string, map[string]string) {
+	pkgs := FMT_PKG
+
+	var param string
+	var params_list []string
+	for i, _ := range method.Params {
+		params_list = append(params_list, fmt.Sprintf("p%d", i))
+	}
+	if len(params_list) > 0 {
+		param = fmt.Sprintf(` else if %s, e := service.Deserialize%sParam(param); e != nil {
+			err = e
+		}`,
+			strings.Join(params_list, ", "), method.Name)
+	}
+
+	var result string
+	if len(method.Results) > 0 {
+		result = fmt.Sprintf(` else {
+			result = service.Serialize%sResult(service.%s(%s))
+		}`,
+			method.Name, method.Name, strings.Join(params_list, ", "))
+	} else {
+		result = fmt.Sprintf(` else {
+			service.%s(%s)
+		}`, method.Name, strings.Join(params_list, ", "))
+	}
+
+	return fmt.Sprintf(`
+	case SYMBOL_%s:
+		methodName = "%s"
+		if service, exist := s.services[i]; !exist {
+			err = fmt.Errorf("[%s] Service %s RUID not exists: %%v", i)
+		}%s%s
+		`, method.Name, method.Name, service.Name, method.Name, param, result), pkgs
+}
+
 func injectServiceLocal(service *tygo.Object, object *doc.Type) (string, string, map[string]string) {
 	var onCreate string
 	if hasMethod(object, &tygo.Method{Name: "onCreate"}) {
@@ -94,10 +132,23 @@ func injectServiceLocal(service *tygo.Object, object *doc.Type) (string, string,
 			s.services[i].onCreate()`
 	}
 
+	serviceTemp := "_"
 	var onDestroy string
 	if hasMethod(object, &tygo.Method{Name: "onDestroy"}) {
+		serviceTemp = "service"
 		onDestroy = `
 			service.onDestroy()`
+	}
+
+	pkgs := LOCAL_PKG
+	var cases []string
+	for _, m := range service.Methods {
+		if !hasMethod(object, m) {
+			continue
+		}
+		case_s, case_p := injectProcedureCallee(service, m)
+		cases = append(cases, case_s)
+		pkgs = update(pkgs, case_p)
 	}
 
 	return fmt.Sprintf("_%sService.services", service.Name), fmt.Sprintf(`
@@ -114,12 +165,19 @@ func %sRegister(server IServer, symbols map[string]uint64) *%sService {
 }
 
 func (s *%sService) Procedure(i ruid.RUID, method uint64, param []byte) (result []byte, err error) {
+	var methodName string
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("[%s] Procedure %%d(%%s) %%v panic:\n>>>>%%v", method, methodName, i, e)
+		}
+	}()
 	switch method {
 	case SYMBOL_CREATE:
+		methodName = "Create"
 		s.mutex.Lock()
 		defer s.mutex.Unlock()
 		if _, exist := s.services[i]; exist {
-			err = fmt.Errorf("[%s] Service RUID already exists: %%v", i)
+			err = fmt.Errorf("[%s] Service create RUID already exists: %%v", i)
 		} else {
 			input := &tygo.ProtoBuf{Buffer: param}
 			var k, t uint64
@@ -131,20 +189,21 @@ func (s *%sService) Procedure(i ruid.RUID, method uint64, param []byte) (result 
 			s.services[i] = &%s{Entity: &Entity{RUID: i, Key: k, Type: t}}%s
 		}
 	case SYMBOL_DESTROY:
+		methodName = "Destroy"
 		s.mutex.Lock()
 		defer s.mutex.Unlock()
-		if service, exist := s.services[i]; !exist {
-			err = fmt.Errorf("[%s] Service RUID not exists: %%v", i)
+		if %s, exist := s.services[i]; !exist {
+			err = fmt.Errorf("[%s] Service destroy RUID not exists: %%v", i)
 		} else {%s
 			delete(s.services, i)
-		}
+		}%s
 	}
 	return
 }
 
 `, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
-		service.Name, service.Name, service.Name, service.Name, service.Name, onCreate,
-		service.Name, onDestroy), LOCAL_PKG
+		service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
+		onCreate, serviceTemp, service.Name, onDestroy, strings.Join(cases, "")), pkgs
 }
 
 func injectProcedureCaller(owner string, service string, method *tygo.Method, local string) (string, map[string]string) {
