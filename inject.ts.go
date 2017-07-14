@@ -52,9 +52,13 @@ func injectTypescript(dir string, entities []*Entity) {
 
 declare module ibelie.rpc {
 	class Entity {
+		__class__: string;
 		isAwake: boolean;
 		Awake(): void;
-		Sleep(): void;%s
+		Sleep(): void;
+		ByteSize(): number;
+		Serialize(): Uint8Array;
+		Deserialize(data: Uint8Array): void;%s
 	}
 
 	class Component {
