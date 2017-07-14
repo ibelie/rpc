@@ -157,6 +157,54 @@ func packageDoc(path string) *doc.Package {
 	}
 }
 
+func resolveTypes(types []tygo.Type, typesMap map[string]tygo.Type, typ tygo.Type) []tygo.Type {
+	switch t := typ.(type) {
+	case *tygo.InstanceType:
+		if _, exist := typesMap[t.Name]; !exist && (t.Name != "Entity" || t.PkgName != "" || t.PkgPath != "") {
+			for _, typ := range tygo.Extract(t.PkgPath, ReplaceEntity) {
+				switch t := typ.(type) {
+				case *tygo.Object:
+					typesMap[t.Name] = t
+					types = append(types, t)
+					types = resolveTypes(types, typesMap, t)
+				case *tygo.Enum:
+					typesMap[t.Name] = t
+					types = append(types, t)
+					types = resolveTypes(types, typesMap, t)
+				}
+			}
+			if _, exist := typesMap[t.Name]; !exist {
+				log.Fatalf("[RPC][Entity] Cannot resolve type: %v", t)
+			}
+		}
+	case *tygo.Object:
+		if t.HasParent() {
+			types = resolveTypes(types, typesMap, t.Parent)
+		}
+		for _, f := range t.Fields {
+			types = resolveTypes(types, typesMap, f)
+		}
+		for _, m := range t.Methods {
+			for _, p := range m.Params {
+				types = resolveTypes(types, typesMap, p)
+			}
+			for _, r := range m.Results {
+				types = resolveTypes(types, typesMap, r)
+			}
+		}
+	case *tygo.ListType:
+		types = resolveTypes(types, typesMap, t.E)
+	case *tygo.DictType:
+		types = resolveTypes(types, typesMap, t.K)
+		types = resolveTypes(types, typesMap, t.V)
+	case *tygo.VariantType:
+		for _, ts := range t.Ts {
+			types = resolveTypes(types, typesMap, ts)
+		}
+	}
+	return types
+}
+
 func resolveEntities(entityMap map[string]map[string][]string) (entities []*Entity, types []tygo.Type) {
 	typesMap := make(map[string]tygo.Type)
 	var entitySorted []string
@@ -203,6 +251,7 @@ func resolveEntities(entityMap map[string]map[string][]string) (entities []*Enti
 	sort.Strings(typesSorted)
 	for _, n := range typesSorted {
 		types = append(types, typesMap[n])
+		types = resolveTypes(types, typesMap, typesMap[n])
 	}
 
 	return
