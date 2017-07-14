@@ -95,6 +95,14 @@ declare module ibelie.rpc {
 		Entity: Entity;
 		constructor(entity: Entity);
 	}
+
+	class Connection {
+		socket: WebSocket;
+		session: entities.Session;
+		entities: {[index: string]: Entity};
+		constructor(url: string);
+		disconnect(): void;
+	}
 }
 `, strings.Join(methods, ""))))
 

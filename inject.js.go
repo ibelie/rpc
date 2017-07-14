@@ -53,6 +53,32 @@ Entity.prototype.Deserialize = function(data) {
 	this.Key  = protobuf.ReadVarint();
 	this.Type = protobuf.ReadVarint();
 };
+
+var ibelie = {};
+ibelie.rpc = {};
+ibelie.rpc.Entity = Entity;
+ibelie.rpc.Component = function(entity) {
+	this.Entity = entity;
+};
+
+ibelie.rpc.Connection = function(url) {
+	var conn = this;
+	var socket = new WebSocket(url);
+	socket.onopen = function (event) {
+		socket.onmessage = function(event) {
+			console.warn('[Connection] Socket has been closed:', event, conn);
+		};
+		socket.onclose = function(event) {
+			console.warn('[Connection] handler:', event, conn);
+		};
+	};
+	this.socket = socket;
+	this.entities = {};
+};
+
+ibelie.rpc.Connection.prototype.disconnect = function() {
+	this.socket.close();
+};
 `)))
 
 	ioutil.WriteFile(path.Join(dir, "rpc.js"), buffer.Bytes(), 0666)
