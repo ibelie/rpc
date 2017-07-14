@@ -7,6 +7,7 @@ package rpc
 import (
 	"log"
 	"os"
+	"path"
 	"reflect"
 	"sort"
 	"strings"
@@ -25,20 +26,25 @@ type Depend struct {
 	Services []string
 }
 
+type Entity struct {
+	Name       string
+	Components []*tygo.Object
+}
+
 var (
-	SRC_PATH = os.Getenv("GOPATH") + "/src/"
+	SRC_PATH = path.Join(os.Getenv("GOPATH"), "src")
 	PKG_PATH = reflect.TypeOf(Depend{}).PkgPath()
 )
 
-func Extract(path string) (pkgname string, depends []*Depend) {
-	buildPackage, err := build.Import(path, "", build.ImportComment)
+func Extract(dir string) (pkgname string, depends []*Depend) {
+	buildPackage, err := build.Import(dir, "", build.ImportComment)
 	if err != nil {
 		log.Fatalf("[RPC][Entity] Cannot import package:\n>>>>%v", err)
 		return
 	}
 	fs := token.NewFileSet()
 	for _, filename := range buildPackage.GoFiles {
-		file, err := parser.ParseFile(fs, buildPackage.Dir+"/"+filename, nil, parser.ParseComments)
+		file, err := parser.ParseFile(fs, path.Join(buildPackage.Dir, filename), nil, parser.ParseComments)
 		if err != nil {
 			log.Fatalf("[RPC][Entity] Cannot parse file:\n>>>>%v", err)
 		}
@@ -149,4 +155,40 @@ func packageDoc(path string) *doc.Package {
 	} else {
 		return doc.New(pkgs[p.Name], p.ImportPath, doc.AllDecls)
 	}
+}
+
+func getEntities(entityMap map[string]map[string][]string) (entities []*Entity) {
+	var entitySorted []string
+	for n, _ := range entityMap {
+		entitySorted = append(entitySorted, n)
+	}
+	sort.Strings(entitySorted)
+
+	for _, n := range entitySorted {
+		var componentSorted []string
+		componentMap := make(map[string]*tygo.Object)
+		for pkg, names := range entityMap[n] {
+			if _, err := build.Import(pkg, "", build.ImportComment); err != nil {
+				log.Printf("[RPC][Entity] Ignore component:\n>>>>%v", err)
+				continue
+			}
+			for _, t := range tygo.Extract(pkg, nil) {
+				for _, s := range names {
+					if object, ok := t.(*tygo.Object); ok &&
+						object.Parent.Name == "Entity" && s == object.Name {
+						componentSorted = append(componentSorted, s)
+						componentMap[s] = object
+					}
+				}
+			}
+		}
+		sort.Strings(componentSorted)
+		var components []*tygo.Object
+		for _, c := range componentSorted {
+			components = append(components, componentMap[c])
+		}
+		entities = append(entities, &Entity{Name: n, Components: components})
+	}
+
+	return
 }

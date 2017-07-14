@@ -7,6 +7,7 @@ package rpc
 import (
 	"bytes"
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 
@@ -88,8 +89,8 @@ func (e *Entity) Deserialize(input *tygo.ProtoBuf) (err error) {
 `
 )
 
-func Entity(path string, types []tygo.Type) {
-	pkgname, depends := Extract(path)
+func Go(dir string, types []tygo.Type) {
+	pkgname, depends := Extract(dir)
 	pkgs := ENTITY_PKG
 	var head bytes.Buffer
 	var body bytes.Buffer
@@ -144,17 +145,17 @@ package %s
 	}
 
 	var sortedPkg []string
-	for path, _ := range pkgs {
-		sortedPkg = append(sortedPkg, path)
+	for pkg, _ := range pkgs {
+		sortedPkg = append(sortedPkg, pkg)
 	}
 	sort.Strings(sortedPkg)
-	for _, path := range sortedPkg {
+	for _, pkg := range sortedPkg {
 		head.Write([]byte(fmt.Sprintf(`
-import %s"%s"`, pkgs[path], path)))
+import %s"%s"`, pkgs[pkg], pkg)))
 	}
 
 	head.Write(body.Bytes())
-	ioutil.WriteFile(SRC_PATH+path+"/entity.rpc.go", head.Bytes(), 0666)
+	ioutil.WriteFile(path.Join(SRC_PATH, dir, "entity.rpc.go"), head.Bytes(), 0666)
 }
 
 func entityInitialize(services []*tygo.Object) (string, map[string]string) {

@@ -6,7 +6,7 @@ package main
 
 import (
 	"flag"
-	"github.com/ibelie/rpc/typescript"
+	"github.com/ibelie/rpc"
 )
 
 func main() {
@@ -14,5 +14,5 @@ func main() {
 	tsOut := flag.String("ts", "", "output typescript dir")
 	goOut := flag.String("go", "", "output golang dir")
 	flag.Parse()
-	typescript.Inject(*input, *tsOut, *goOut)
+	rpc.Typescript(*input, *tsOut, *goOut)
 }

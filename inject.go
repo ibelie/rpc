@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path"
 	"sort"
 	"strings"
 
@@ -27,7 +28,7 @@ var (
 	}
 )
 
-func Inject(path string, filename string, pkgname string, types []tygo.Type) {
+func Inject(dir string, filename string, pkgname string, types []tygo.Type) {
 	var services []*tygo.Object
 	for _, t := range types {
 		if object, ok := isService(t); ok {
@@ -38,15 +39,15 @@ func Inject(path string, filename string, pkgname string, types []tygo.Type) {
 			}
 		}
 	}
-	tygo.Inject(path, filename, pkgname, types)
-	injectfile := SRC_PATH + path + "/" + strings.Replace(filename, ".go", ".rpc.go", 1)
+	tygo.Inject(dir, filename, pkgname, types)
+	injectfile := path.Join(SRC_PATH, dir, strings.Replace(filename, ".go", ".rpc.go", 1))
 	if len(services) == 0 {
 		os.Remove(injectfile)
 		return
 	}
 
 	objects := make(map[string]*doc.Type)
-	if d := packageDoc(path); d != nil {
+	if d := packageDoc(dir); d != nil {
 		for _, t := range d.Types {
 			for _, s := range services {
 				if t.Name == s.Name {
@@ -79,13 +80,13 @@ package %s
 	}
 
 	var sortedPkg []string
-	for path, _ := range pkgs {
-		sortedPkg = append(sortedPkg, path)
+	for pkg, _ := range pkgs {
+		sortedPkg = append(sortedPkg, pkg)
 	}
 	sort.Strings(sortedPkg)
-	for _, path := range sortedPkg {
+	for _, pkg := range sortedPkg {
 		head.Write([]byte(fmt.Sprintf(`
-import %s"%s"`, pkgs[path], path)))
+import %s"%s"`, pkgs[pkg], pkg)))
 	}
 
 	head.Write(body.Bytes())
