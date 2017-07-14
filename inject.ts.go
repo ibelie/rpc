@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"io/ioutil"
+
+	"github.com/ibelie/tygo"
 )
 
 func Typescript(input string, tsOut string, goOut string) {
@@ -36,7 +38,8 @@ func Typescript(input string, tsOut string, goOut string) {
 			entityMap[e[1]][pkg] = append(entityMap[e[1]][pkg], c[1])
 		}
 	}
-	entities := getEntities(entityMap)
+	entities, types := resolveEntities(entityMap)
+	tygo.Typescript(tsOut, "types", "ibelie.rpc", types, nil)
 	injectJavascript(tsOut, entities)
 	injectTypescript(tsOut, entities)
 }

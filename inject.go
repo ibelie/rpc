@@ -28,15 +28,23 @@ var (
 	}
 )
 
-func Inject(dir string, filename string, pkgname string, types []tygo.Type) {
-	var services []*tygo.Object
+func ReplaceEntity(dir string, filename string, pkgname string, types []tygo.Type) {
 	for _, t := range types {
 		if object, ok := isService(t); ok {
-			services = append(services, object)
 			object.Parent.Object = &tygo.Object{
 				Name:   "Entity",
 				Parent: &tygo.InstanceType{PkgName: "tygo", PkgPath: tygo.TYGO_PATH, Name: "Tygo"},
 			}
+		}
+	}
+}
+
+func Inject(dir string, filename string, pkgname string, types []tygo.Type) {
+	ReplaceEntity(dir, filename, pkgname, types)
+	var services []*tygo.Object
+	for _, t := range types {
+		if object, ok := isService(t); ok {
+			services = append(services, object)
 		}
 	}
 	tygo.Inject(dir, filename, pkgname, types)

@@ -157,7 +157,8 @@ func packageDoc(path string) *doc.Package {
 	}
 }
 
-func getEntities(entityMap map[string]map[string][]string) (entities []*Entity) {
+func resolveEntities(entityMap map[string]map[string][]string) (entities []*Entity, types []tygo.Type) {
+	typesMap := make(map[string]tygo.Type)
 	var entitySorted []string
 	for n, _ := range entityMap {
 		entitySorted = append(entitySorted, n)
@@ -172,13 +173,18 @@ func getEntities(entityMap map[string]map[string][]string) (entities []*Entity) 
 				log.Printf("[RPC][Entity] Ignore component:\n>>>>%v", err)
 				continue
 			}
-			for _, t := range tygo.Extract(pkg, nil) {
-				for _, s := range names {
-					if object, ok := t.(*tygo.Object); ok &&
-						object.Parent.Name == "Entity" && s == object.Name {
-						componentSorted = append(componentSorted, s)
-						componentMap[s] = object
+			for _, typ := range tygo.Extract(pkg, ReplaceEntity) {
+				switch t := typ.(type) {
+				case *tygo.Object:
+					for _, s := range names {
+						if t.Parent.Name == "Entity" && s == t.Name {
+							componentSorted = append(componentSorted, s)
+							componentMap[s] = t
+						}
 					}
+					typesMap[t.Name] = t
+				case *tygo.Enum:
+					typesMap[t.Name] = t
 				}
 			}
 		}
@@ -188,6 +194,15 @@ func getEntities(entityMap map[string]map[string][]string) (entities []*Entity) 
 			components = append(components, componentMap[c])
 		}
 		entities = append(entities, &Entity{Name: n, Components: components})
+	}
+
+	var typesSorted []string
+	for n, _ := range typesMap {
+		typesSorted = append(typesSorted, n)
+	}
+	sort.Strings(typesSorted)
+	for _, n := range typesSorted {
+		types = append(types, typesMap[n])
 	}
 
 	return
