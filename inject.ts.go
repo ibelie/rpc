@@ -61,7 +61,8 @@ declare module ibelie.rpc {
 		Entity: Entity;
 		constructor(entity: Entity);
 	}
-}`, strings.Join(methods, ""))))
+}
+`, strings.Join(methods, ""))))
 
 	ioutil.WriteFile(path.Join(dir, "rpc.d.ts"), buffer.Bytes(), 0666)
 }
