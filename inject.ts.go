@@ -37,11 +37,8 @@ func Typescript(input string, tsOut string, goOut string) {
 		}
 	}
 	entities := getEntities(entityMap)
+	injectJavascript(tsOut, entities)
 	injectTypescript(tsOut, entities)
-}
-
-func injectGo(dir string, entities []*Entity) {
-
 }
 
 func injectTypescript(dir string, entities []*Entity) {
