@@ -110,8 +110,7 @@ package %s
 	}
 
 	for _, depend := range depends {
-		types = tygo.Extract(depend.Path, nil)
-		for _, t := range types {
+		for _, t := range tygo.Extract(depend.Path, nil) {
 			for _, s := range depend.Services {
 				if object, ok := isService(t); ok {
 					if s == object.Name {
