@@ -84,8 +84,6 @@ declare module ibelie.rpc {
 	class Entity {
 		__class__: string;
 		isAwake: boolean;
-		Awake(): void;
-		Sleep(): void;
 		ByteSize(): number;
 		Serialize(): Uint8Array;
 		Deserialize(data: Uint8Array): void;%s
@@ -94,6 +92,8 @@ declare module ibelie.rpc {
 	class Component {
 		Entity: Entity;
 		constructor(entity: Entity);
+		Awake(entity: Entity): any;
+		Drop(entity: Entity): any;
 	}
 
 	class Connection {
