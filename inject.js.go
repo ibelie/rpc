@@ -30,12 +30,6 @@ Entity = function() {
 	this.Type = 0;
 };
 
-Entity.prototype.Awake = function() {
-};
-
-Entity.prototype.Sleep = function() {
-};
-
 Entity.prototype.ByteSize = function() {
 	return tyts.SizeVarint(this.RUID) + tyts.SizeVarint(this.Key) + tyts.SizeVarint(this.Type);
 };
@@ -57,8 +51,55 @@ Entity.prototype.Deserialize = function(data) {
 var ibelie = {};
 ibelie.rpc = {};
 ibelie.rpc.Entity = Entity;
+
 ibelie.rpc.Component = function(entity) {
 	this.Entity = entity;
+};
+
+ibelie.rpc.Component.prototype.Awake = function(e) {
+	if (e.isAwake) {
+		console.warn('[Entity] Already awaked:', e);
+		return e;
+	}
+	var conn = this.Entity.connection;
+	var entity = conn.entities[e.RUID];
+	if (entity) {
+		return entity
+	}
+	switch (e.Type) {%s
+	default:
+		console.error('[Entity] Awake unknown entity type:', e);
+		return e;
+	}
+	entity.RUID	= e.RUID;
+	entity.Key	= e.Key;
+	entity.Type	= e.Type;
+	var writer = new jspb.BinaryWriter();
+	writer.writeMessage(1, entity, serializeEntity);
+	writer.writeMessage(9, {}, (x, y) => null);
+	conn.socket.send(goog.crypt.base64.encodeByteArray(writer.getResultBuffer()));
+	conn.entities[entity.RUID] = entity;
+	entity.connection = conn;
+	return entity;
+};
+
+ibelie.rpc.Component.prototype.Drop = function(e) {
+	if (!e || !e.isAwake) {
+		console.warn('[Entity] Not awaked:', e);
+		return;
+	}
+	switch (e.Type) {%s
+	default:
+		console.error('[Entity] Drop unknown entity type:', e);
+		break
+	}
+	e.isAwake = false;
+	delete this.Entity.connection.entities[e.RUID];
+	var entity = new Entity();
+	entity.RUID	= e.RUID;
+	entity.Key	= e.Key;
+	entity.Type	= e.Type;
+	return entity;
 };
 
 ibelie.rpc.Connection = function(url) {
