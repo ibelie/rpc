@@ -17,11 +17,11 @@ import (
 	"github.com/ibelie/tygo"
 )
 
-func Typescript(input string, tsOut string, goOut string) {
+func Typescript(input string, tsOut string) []*Entity {
 	text, err := ioutil.ReadFile(input)
 	if err != nil {
 		log.Fatalf("[RPC][Typescript] Cannot read file:\n>>>>%v", err)
-		return
+		return nil
 	}
 
 	componentReg := regexp.MustCompile(`([_\d\w]+)\s*:\s*([\._\d\w]+)\s*;`)
@@ -53,6 +53,7 @@ func Typescript(input string, tsOut string, goOut string) {
 	tygo.Typescript(tsOut, "types", "ibelie.rpc", types, []tygo.Type{tygo.SimpleType_UINT64, tygo.SimpleType_UINT64})
 	injectJavascript(tsOut, entities)
 	injectTypescript(tsOut, entities, objects)
+	return entities
 }
 
 func injectTypescript(dir string, entities []*Entity, objects map[string]*tygo.Object) {
