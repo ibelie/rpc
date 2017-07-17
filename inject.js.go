@@ -34,7 +34,7 @@ func injectJavascript(dir string, entities []*Entity) {
 				}
 				methods = append(methods, fmt.Sprintf(`
 Entity.prototype.Deserialize%s = function(data) {
-	return ibelie.rpc.Fighter.Deserialize%s(data);
+	return ibelie.rpc.%s.Deserialize%s(data);
 };
 
 Entity.prototype.%s = function(%s) {
@@ -42,10 +42,11 @@ Entity.prototype.%s = function(%s) {
 		console.warn('[Entity] Not awake:', this);
 		return;
 	}
-	var data = ibelie.rpc.Fighter.Serialize%s(%s);
+	var data = ibelie.rpc.%s.Serialize%s(%s);
 	this.connection.send(this, ibelie.rpc.Symbols.%s, data);
 };
-`, m.Name, m.Name, m.Name, strings.Join(params, ", "), m.Name, strings.Join(params, ", "), m.Name))
+`, m.Name, c.Name, m.Name, m.Name, strings.Join(params, ", "),
+					c.Name, m.Name, strings.Join(params, ", "), m.Name))
 				requireMap[fmt.Sprintf(`
 goog.require('ibelie.rpc.%s');`, c.Name)] = true
 				methodsMap[m.Name] = true
@@ -178,7 +179,15 @@ ibelie.rpc.Connection = function(url) {
 				var method = ibelie.rpc.Dictionary[protobuf.ReadVarint()];
 				var data = protobuf.ReadBuffer(protobuf.ReadVarint());
 				if (ibelie.rpc[method]) {
-					ibelie.rpc[method].prototype.Deserialize.call(entity[method], data);
+					if (data[0]) {
+						var buffer = new tyts.ProtoBuf(data);
+						var property = ibelie.rpc.Dictionary[buffer.ReadVarint()];
+						var newValue = ibelie.rpc[method]['Deserialize' + property].call(entity[method], data.subarray(buffer.offset))[0];
+						var oldValue = entity[method][property];
+						entity[method][property] = newValue;
+					} else {
+						ibelie.rpc[method].prototype.Deserialize.call(entity[method], data.subarray(1));
+					}
 				} else {
 					var args = entity['Deserialize' + method](data);
 					for (var k in entity) {
