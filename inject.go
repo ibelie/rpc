@@ -27,9 +27,10 @@ var (
 		"github.com/ibelie/tygo": "",
 	}
 	PROP_PRE = []tygo.Type{tygo.SimpleType_UINT64, tygo.SimpleType_UINT64}
+	DELEGATE = "Delegate"
 )
 
-func ReplaceEntity(dir string, filename string, pkgname string, types []tygo.Type, _ []tygo.Type) {
+func ReplaceEntity(dir string, filename string, pkgname string, types []tygo.Type) {
 	for _, t := range types {
 		if object, ok := isService(t); ok {
 			object.Parent.Object = &tygo.Object{
@@ -40,15 +41,19 @@ func ReplaceEntity(dir string, filename string, pkgname string, types []tygo.Typ
 	}
 }
 
-func Inject(dir string, filename string, pkgname string, types []tygo.Type, _ []tygo.Type) {
-	ReplaceEntity(dir, filename, pkgname, types, nil)
+func Inject(dir string, filename string, pkgname string, types []tygo.Type) {
+	ReplaceEntity(dir, filename, pkgname, types)
 	var services []*tygo.Object
 	for _, t := range types {
 		if object, ok := isService(t); ok {
 			services = append(services, object)
 		}
 	}
-	tygo.Inject(dir, filename, pkgname, types, PROP_PRE)
+	tygo.PROP_PRE = PROP_PRE
+	tygo.DELEGATE = DELEGATE
+	tygo.Inject(dir, filename, pkgname, types)
+	tygo.PROP_PRE = nil
+	tygo.DELEGATE = ""
 	injectfile := path.Join(SRC_PATH, dir, strings.Replace(filename, ".go", ".rpc.go", 1))
 	if len(services) == 0 {
 		os.Remove(injectfile)
@@ -77,14 +82,25 @@ package %s
 
 	var pkgs map[string]string
 	for _, service := range services {
+		var methods []string
 		local_m, local_s, local_p := injectServiceLocal(service, objects[service.Name])
-		common_s, common_p := injectServiceCommon(service, local_m)
 		property_s, property_p := injectServiceProperty(service)
+		for _, method := range service.Methods {
+			method_s, method_p := injectProcedureCaller(service.Name+DELEGATE, service.Name, method, local_m)
+			pkgs = update(pkgs, method_p)
+			methods = append(methods, method_s)
+		}
+
 		body.Write([]byte(local_s))
-		body.Write([]byte(common_s))
 		body.Write([]byte(property_s))
+		body.Write([]byte(fmt.Sprintf(`
+type %sDelegate Entity
+
+func (e *Entity) %s() *%sDelegate {
+	return (*%sDelegate)(e)
+}
+%s`, service.Name, service.Name, service.Name, service.Name, strings.Join(methods, ""))))
 		pkgs = update(pkgs, local_p)
-		pkgs = update(pkgs, common_p)
 		pkgs = update(pkgs, property_p)
 	}
 
@@ -292,31 +308,6 @@ func (s *%s) %s(%s) (%s) {%s%s
 }
 `, owner, method.Name, strings.Join(params_declare, ", "), strings.Join(results_declare, ", "),
 		checkLocal, result_remote), pkgs
-}
-
-func injectServiceCommon(service *tygo.Object, local string) (string, map[string]string) {
-	var pkgs map[string]string
-	var methods []string
-	for _, method := range service.Methods {
-		param_s, param_p := tygo.TypeListSerialize(service.Name+"Delegate", method.Name, "param", method.Params)
-		result_s, result_p := tygo.TypeListDeserialize(service.Name+"Delegate", method.Name, "result", method.Results)
-		method_s, method_p := injectProcedureCaller(service.Name+"Delegate", service.Name, method, local)
-		pkgs = update(pkgs, param_p)
-		pkgs = update(pkgs, result_p)
-		pkgs = update(pkgs, method_p)
-		methods = append(methods, param_s)
-		methods = append(methods, result_s)
-		methods = append(methods, method_s)
-	}
-
-	return fmt.Sprintf(`
-type %sDelegate Entity
-
-func (e *Entity) %s() *%sDelegate {
-	return (*%sDelegate)(e)
-}
-%s`, service.Name, service.Name, service.Name, service.Name,
-		strings.Join(methods, "")), pkgs
 }
 
 func injectServiceProperty(service *tygo.Object) (string, map[string]string) {
