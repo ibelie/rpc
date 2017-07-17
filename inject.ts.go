@@ -58,8 +58,8 @@ func Typescript(input string, tsOut string, goOut string) {
 func injectTypescript(dir string, entities []*Entity, objects map[string]*tygo.Object) {
 	var buffer bytes.Buffer
 	var methods []string
+	methodsMap := make(map[string]bool)
 	for _, e := range entities {
-		methodsMap := make(map[string]bool)
 		for _, c := range e.Components {
 			for _, m := range c.Methods {
 				if ok, exist := methodsMap[m.Name]; exist && ok {
