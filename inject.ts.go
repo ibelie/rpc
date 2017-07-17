@@ -50,7 +50,7 @@ func Typescript(input string, tsOut string) []*Entity {
 		}
 	}
 
-	tygo.Typescript(tsOut, "types", "ibelie.rpc", types, []tygo.Type{tygo.SimpleType_UINT64, tygo.SimpleType_UINT64})
+	tygo.Typescript(tsOut, "types", "ibelie.rpc", types, PROP_PRE)
 	injectJavascript(tsOut, entities)
 	injectTypescript(tsOut, entities, objects)
 	return entities
@@ -70,7 +70,7 @@ func injectTypescript(dir string, entities []*Entity, objects map[string]*tygo.O
 				}
 				var params []string
 				for i, p := range m.Params {
-					params = append(params, fmt.Sprintf("a%d: %s", i, p.Typescript(objects, nil)))
+					params = append(params, fmt.Sprintf("a%d: %s", i, p.Typescript(objects)))
 				}
 				methods = append(methods, fmt.Sprintf(`
 		%s(%s): void;`, m.Name, strings.Join(params, ", ")))

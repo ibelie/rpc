@@ -26,9 +26,10 @@ var (
 		"github.com/ibelie/ruid": "",
 		"github.com/ibelie/tygo": "",
 	}
+	PROP_PRE = []tygo.Type{tygo.SimpleType_UINT64, tygo.SimpleType_UINT64}
 )
 
-func ReplaceEntity(dir string, filename string, pkgname string, types []tygo.Type) {
+func ReplaceEntity(dir string, filename string, pkgname string, types []tygo.Type, _ []tygo.Type) {
 	for _, t := range types {
 		if object, ok := isService(t); ok {
 			object.Parent.Object = &tygo.Object{
@@ -39,15 +40,15 @@ func ReplaceEntity(dir string, filename string, pkgname string, types []tygo.Typ
 	}
 }
 
-func Inject(dir string, filename string, pkgname string, types []tygo.Type) {
-	ReplaceEntity(dir, filename, pkgname, types)
+func Inject(dir string, filename string, pkgname string, types []tygo.Type, _ []tygo.Type) {
+	ReplaceEntity(dir, filename, pkgname, types, nil)
 	var services []*tygo.Object
 	for _, t := range types {
 		if object, ok := isService(t); ok {
 			services = append(services, object)
 		}
 	}
-	tygo.Inject(dir, filename, pkgname, types)
+	tygo.Inject(dir, filename, pkgname, types, PROP_PRE)
 	injectfile := path.Join(SRC_PATH, dir, strings.Replace(filename, ".go", ".rpc.go", 1))
 	if len(services) == 0 {
 		os.Remove(injectfile)
@@ -323,11 +324,7 @@ func injectServiceProperty(service *tygo.Object) (string, map[string]string) {
 	var codes []string
 	for _, property := range service.Fields {
 		property_s, property_p := property.Go()
-		serialize_s, serialize_p := tygo.TypeListSerialize(service.Name, property.Name, "",
-			[]tygo.Type{tygo.SimpleType_UINT64, tygo.SimpleType_UINT64, property})
 		pkgs = update(pkgs, property_p)
-		pkgs = update(pkgs, serialize_p)
-		codes = append(codes, serialize_s)
 
 		switch property.Type.(type) {
 		case *tygo.ListType:
