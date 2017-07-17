@@ -176,23 +176,56 @@ ibelie.rpc.Connection = function(url) {
 				}
 			}
 			while (!protobuf.End()) {
-				var method = ibelie.rpc.Dictionary[protobuf.ReadVarint()];
+				var name = ibelie.rpc.Dictionary[protobuf.ReadVarint()];
 				var data = protobuf.ReadBuffer(protobuf.ReadVarint());
-				if (ibelie.rpc[method]) {
-					if (data[0]) {
-						var buffer = new tyts.ProtoBuf(data);
-						var property = ibelie.rpc.Dictionary[buffer.ReadVarint()];
-						var newValue = ibelie.rpc[method]['Deserialize' + property].call(entity[method], data.subarray(buffer.offset))[0];
-						var oldValue = entity[method][property];
-						entity[method][property] = newValue;
-					} else {
-						ibelie.rpc[method].prototype.Deserialize.call(entity[method], data.subarray(1));
+				if (name == 'NOTIFY') {
+					var component;
+					var property;
+					var buffer = new tyts.ProtoBuf(data);
+					while (!buffer.End()) {
+						var tag_cutoff = buffer.ReadTag(127);
+						var i = (tag_cutoff[0] >> tyts.WireTypeBits) - 1;
+						if (tag_cutoff[1] && (i == 1 || i == 2) &&
+							(tag_cutoff[0] & tyts.WireTypeMask) == tyts.WireVarint) {
+							if (i == 1) {
+								component = ibelie.rpc.Dictionary[buffer.ReadVarint()];
+							} else {
+								property = ibelie.rpc.Dictionary[buffer.ReadVarint()];
+							}
+							continue;
+						}
+						if (!tag_cutoff[0]) {
+							break;
+						}
+						buffer.SkipField(tag_cutoff[0]);
 					}
+					var newValue = ibelie.rpc[component]['Deserialize' + property](data)[2];
+					var oldValue = entity[component][property];
+					var handler = entity[component][property + 'Handler'];
+					if (oldValue.concat) {
+						entity[component][property] = oldValue.concat(newValue);
+						handler && handler(oldValue, newValue);
+					} else if ((newValue instanceof Object) && !newValue.__class__) {
+						if (!entity[component][property]) {
+							entity[component][property] = {};
+						}
+						for (var k in newValue) {
+							var o = oldValue[k];
+							var n = newValue[k];
+							oldValue[k] = n;
+							handler && handler(k, o, n);
+						}
+					} else {
+						entity[component][property] = newValue;
+						handler && handler(oldValue, newValue);
+					}
+				} else if (ibelie.rpc[name]) {
+					ibelie.rpc[name].prototype.Deserialize.call(entity[name], data.subarray(1));
 				} else {
-					var args = entity['Deserialize' + method](data);
+					var args = entity['Deserialize' + name](data);
 					for (var k in entity) {
 						var v = entity[k];
-						v[method] && v[method].apply(v, args);
+						v[name] && v[name].apply(v, args);
 					}
 				}
 			}
