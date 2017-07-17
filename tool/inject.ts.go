@@ -14,5 +14,7 @@ func main() {
 	tsOut := flag.String("ts", "", "output typescript dir")
 	goOut := flag.String("go", "", "output golang dir")
 	flag.Parse()
-	rpc.Tables(*goOut, rpc.Typescript(*input, *tsOut))
+	entities := rpc.Typescript(*input, *tsOut)
+	rpc.Symbols(*goOut, entities)
+	rpc.Routes(*goOut, entities)
 }
