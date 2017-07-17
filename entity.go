@@ -52,7 +52,7 @@ func NewEntity(i ruid.RUID, k ruid.RUID, t string) *Entity {
 }
 
 func (e *Entity) Create() error {
-	data := make([]byte, tygo.SizeVarint(e.Key) + tygo.SizeVarint(e.Type))
+	data := make([]byte, tygo.SizeVarint(e.Key)+tygo.SizeVarint(e.Type))
 	output := &tygo.ProtoBuf{Buffer: data}
 	output.WriteVarint(e.Key)
 	output.WriteVarint(e.Type)
@@ -181,8 +181,6 @@ func Tables(dir string, entities []*Entity) {
 	}
 
 	var symbolConsts []string
-	var symbolValues []string
-	var symbolSorted []string
 	for i, s := range builtinSymbols {
 		if maxSymbol < len(s) {
 			maxSymbol = len(s)
@@ -196,6 +194,7 @@ func Tables(dir string, entities []*Entity) {
 		}
 	}
 
+	var symbolSorted []string
 	for s, ok := range symbolMap {
 		if !ok {
 			continue
@@ -207,6 +206,7 @@ func Tables(dir string, entities []*Entity) {
 	}
 	sort.Strings(symbolSorted)
 
+	var symbolValues []string
 	for _, s := range builtinSymbols {
 		symbolValues = append(symbolValues, fmt.Sprintf(`
 	"%s": %sSYMBOL_%s,`, s, strings.Repeat(" ", maxSymbol-len(s)), s))
@@ -236,44 +236,46 @@ package main
 }
 
 func entityInitialize(services []*tygo.Object) (string, map[string]string) {
-	symbol_set := make(map[string]bool)
-	var symbol_declare []string
-	var symbol_initialize []string
-	for _, service := range services {
-		if ok, exist := symbol_set[service.Name]; !ok || !exist {
-			symbol_declare = append(symbol_declare, fmt.Sprintf(`
-	SYMBOL_%s uint64`, service.Name))
-			symbol_initialize = append(symbol_initialize, fmt.Sprintf(`
-		SYMBOL_%s = Symbols["%s"]`, service.Name, service.Name))
-			symbol_set[service.Name] = true
+	maxSymbol := 0
+	symbolMap := make(map[string]bool)
+	for _, s := range services {
+		symbolMap[s.Name] = true
+		for _, f := range s.Fields {
+			symbolMap[f.Name] = true
 		}
-		for _, field := range service.Fields {
-			if ok, exist := symbol_set[field.Name]; !ok || !exist {
-				symbol_declare = append(symbol_declare, fmt.Sprintf(`
-	SYMBOL_%s uint64`, field.Name))
-				symbol_initialize = append(symbol_initialize, fmt.Sprintf(`
-		SYMBOL_%s = Symbols["%s"]`, field.Name, field.Name))
-				symbol_set[field.Name] = true
-			}
-		}
-		for _, method := range service.Methods {
-			if ok, exist := symbol_set[method.Name]; !ok || !exist {
-				symbol_declare = append(symbol_declare, fmt.Sprintf(`
-	SYMBOL_%s uint64`, method.Name))
-				symbol_initialize = append(symbol_initialize, fmt.Sprintf(`
-		SYMBOL_%s = Symbols["%s"]`, method.Name, method.Name))
-				symbol_set[method.Name] = true
-			}
+		for _, m := range s.Methods {
+			symbolMap[m.Name] = true
 		}
 	}
 
-	var symbol_const []string
+	var symbolSorted []string
+	for s, ok := range symbolMap {
+		if !ok {
+			continue
+		}
+		if maxSymbol < len(s) {
+			maxSymbol = len(s)
+		}
+		symbolSorted = append(symbolSorted, s)
+	}
+	sort.Strings(symbolSorted)
+
+	var symbolDeclare []string
+	var symbolInitialize []string
+	for _, s := range symbolSorted {
+		symbolDeclare = append(symbolDeclare, fmt.Sprintf(`
+	SYMBOL_%s %suint64`, s, strings.Repeat(" ", maxSymbol-len(s))))
+		symbolInitialize = append(symbolInitialize, fmt.Sprintf(`
+		SYMBOL_%s = Symbols["%s"]`, s, s))
+	}
+
+	var symbolConst []string
 	for i, s := range builtinSymbols {
 		if i == 0 {
-			symbol_const = append(symbol_const, fmt.Sprintf(`
+			symbolConst = append(symbolConst, fmt.Sprintf(`
 	SYMBOL_%s uint64 = iota`, s))
 		} else {
-			symbol_const = append(symbol_const, fmt.Sprintf(`
+			symbolConst = append(symbolConst, fmt.Sprintf(`
 	SYMBOL_%s`, s))
 		}
 	}
@@ -293,7 +295,7 @@ func InitializeServer(server IServer, symbols map[string]uint64) {
 		Symbols = symbols%s
 	}
 }
-`, strings.Join(symbol_const, ""), strings.Join(symbol_declare, ""), strings.Join(symbol_initialize, "")), nil
+`, strings.Join(symbolConst, ""), strings.Join(symbolDeclare, ""), strings.Join(symbolInitialize, "")), nil
 }
 
 func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[string]string) {

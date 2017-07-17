@@ -132,7 +132,7 @@ func injectProcedureCallee(service *tygo.Object, method *tygo.Method) (string, m
 		if service, exist := s.services[i]; !exist {
 			err = fmt.Errorf("[%s] Service %s RUID not exists: %%v", i)
 		}%s%s
-		`, method.Name, method.Name, service.Name, method.Name, param, result), FMT_PKG
+`, method.Name, method.Name, service.Name, method.Name, param, result), FMT_PKG
 }
 
 func injectServiceLocal(service *tygo.Object, object *doc.Type) (string, string, map[string]string) {
