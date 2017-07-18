@@ -186,9 +186,9 @@ type %sService struct {
 
 var _%sService = %sService{services: make(map[ruid.RUID]*%s)}
 
-func %sRegister(server IServer, symbols map[string]uint64) *%sService {
+func %sRegister(server IServer, symbols map[string]uint64) (uint64, *%sService) {
 	InitializeServer(server, symbols)
-	return _%sService
+	return SYMBOL_%s, _%sService
 }
 
 func (s *%sService) Procedure(i ruid.RUID, method uint64, param []byte) (result []byte, err error) {
@@ -236,7 +236,7 @@ func (s *%sService) Procedure(i ruid.RUID, method uint64, param []byte) (result 
 	}
 	return
 }
-`, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
+`, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
 		service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
 		onCreate, serviceTemp, service.Name, onDestroy, service.Name, strings.Join(cases, "")), pkgs
 }
