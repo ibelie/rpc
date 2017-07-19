@@ -52,9 +52,9 @@ func NewEntity(i ruid.RUID, k ruid.RUID, t string) *Entity {
 }
 
 func (e *Entity) Create() error {
-	data := make([]byte, tygo.SizeVarint(e.Key)+tygo.SizeVarint(e.Type))
+	data := make([]byte, tygo.SizeVarint(uint64(e.Key))+tygo.SizeVarint(e.Type))
 	output := &tygo.ProtoBuf{Buffer: data}
-	output.WriteVarint(e.Key)
+	output.WriteVarint(uint64(e.Key))
 	output.WriteVarint(e.Type)
 	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_CREATE, data, nil)
 }
@@ -65,7 +65,7 @@ func (e *Entity) Destroy() error {
 
 func (e *Entity) ByteSize() (size int) {
 	if e != nil {
-		size = tygo.SizeVarint(e.RUID) + tygo.SizeVarint(e.Key) + tygo.SizeVarint(e.Type)
+		size = tygo.SizeVarint(uint64(e.RUID)) + tygo.SizeVarint(uint64(e.Key)) + tygo.SizeVarint(e.Type)
 		e.SetCachedSize(size)
 	}
 	return
@@ -73,8 +73,8 @@ func (e *Entity) ByteSize() (size int) {
 
 func (e *Entity) Serialize(output *tygo.ProtoBuf) {
 	if e != nil {
-		output.WriteVarint(e.RUID)
-		output.WriteVarint(e.Key)
+		output.WriteVarint(uint64(e.RUID))
+		output.WriteVarint(uint64(e.Key))
 		output.WriteVarint(e.Type)
 	}
 }
@@ -88,8 +88,8 @@ func (e *Entity) Deserialize(input *tygo.ProtoBuf) (err error) {
 	} else if e.Type, err = input.ReadVarint(); err != nil {
 		return
 	}
-	e.RUID = i
-	e.Key = k
+	e.RUID = ruid.RUID(i)
+	e.Key = ruid.RUID(k)
 	return
 }
 `
@@ -387,7 +387,7 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 		resultChan := make(chan []byte)
 		go func() {
 			if err = Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_%s, %s, resultChan); err == nil {
-				for _, result := range resultChan {
+				for result := range resultChan {
 					var r %s
 					r, err = (*%sDelegate)(nil).Deserialize%sResult(result)
 					rChan <- r

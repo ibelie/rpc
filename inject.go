@@ -188,7 +188,7 @@ var _%sService = %sService{services: make(map[ruid.RUID]*%s)}
 
 func %sRegister(server IServer, symbols map[string]uint64) (uint64, *%sService) {
 	InitializeServer(server, symbols)
-	return SYMBOL_%s, _%sService
+	return SYMBOL_%s, &_%sService
 }
 
 func (s *%sService) Procedure(i ruid.RUID, method uint64, param []byte) (result []byte, err error) {
@@ -214,7 +214,7 @@ func (s *%sService) Procedure(i ruid.RUID, method uint64, param []byte) (result 
 			} else if t, err = input.ReadVarint(); err != nil {
 				return
 			}
-			s.services[i] = &%s{Entity: &Entity{RUID: i, Key: k, Type: t}}%s
+			s.services[i] = &%s{Entity: &Entity{RUID: i, Key: ruid.RUID(k), Type: t}}%s
 		}
 	case SYMBOL_DESTROY:
 		methodName = "Destroy"
@@ -274,7 +274,7 @@ func injectProcedureCaller(owner string, service string, method *tygo.Method, lo
 		result_local = fmt.Sprintf(`
 		%s = local.%s(%s)`, strings.Join(results_list, ", "), method.Name, strings.Join(params_list, ", "))
 		result_remote = fmt.Sprintf(`
-	var result string
+	var result []byte
 	if result, err = Server.Procedure(s.RUID, s.Key, SYMBOL_%s, SYMBOL_%s, %s); err != nil {
 		return
 	}
@@ -314,40 +314,46 @@ func injectServiceProperty(service *tygo.Object) (string, map[string]string) {
 	var pkgs map[string]string
 	var codes []string
 	for _, property := range service.Fields {
-		property_s, property_p := property.Go()
-		pkgs = update(pkgs, property_p)
-
-		switch property.Type.(type) {
+		switch t := property.Type.(type) {
 		case *tygo.ListType:
+			element_s, element_p := t.E.Go()
+			pkgs = update(pkgs, element_p)
 			codes = append(codes, fmt.Sprintf(`
-func (s *%s) extend%s(x %s) error {
-	if x == nil || len(x) <= 0 {
-		return
+func (s *%s) append%s(x ...%s) error {
+	if len(x) <= 0 {
+		return nil
 	}
 	s.%s = append(s.%s, x...)
+	e := s.Entity
 	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_NOTIFY, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x), nil)
 }
-`, service.Name, strings.Title(property.Name), property_s, property.Name, property.Name,
+`, service.Name, strings.Title(property.Name), element_s, property.Name, property.Name,
 				property.Name, service.Name, property.Name))
 		case *tygo.DictType:
+			property_s, property_p := property.Go()
+			pkgs = update(pkgs, property_p)
 			codes = append(codes, fmt.Sprintf(`
 func (s *%s) update%s(x %s) error {
 	if x == nil || len(x) <= 0 {
-		return
+		return nil
 	} else if s.%s == nil {
 		s.%s = make(%s)
 	}
 	for k, v := range x {
 		s.%s[k] = v
 	}
+	e := s.Entity
 	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_NOTIFY, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x), nil)
 }
 `, service.Name, strings.Title(property.Name), property_s, property.Name, property.Name,
 				property_s, property.Name, property.Name, service.Name, property.Name))
 		default:
+			property_s, property_p := property.Go()
+			pkgs = update(pkgs, property_p)
 			codes = append(codes, fmt.Sprintf(`
 func (s *%s) set%s(x %s) error {
 	s.%s = x
+	e := s.Entity
 	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_NOTIFY, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x), nil)
 }
 `, service.Name, strings.Title(property.Name), property_s, property.Name, property.Name,
