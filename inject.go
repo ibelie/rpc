@@ -21,8 +21,9 @@ import (
 var (
 	FMT_PKG   = map[string]string{"fmt": ""}
 	LOCAL_PKG = map[string]string{
-		"fmt":  "",
-		"sync": "",
+		"fmt":                    "",
+		"sync":                   "",
+		"github.com/ibelie/rpc":  "",
 		"github.com/ibelie/ruid": "",
 		"github.com/ibelie/tygo": "",
 	}
@@ -178,20 +179,20 @@ func injectServiceLocal(service *tygo.Object, object *doc.Type) (string, string,
 		pkgs = update(pkgs, case_p)
 	}
 
-	return fmt.Sprintf("_%sService.services", service.Name), fmt.Sprintf(`
-type %sService struct {
+	return fmt.Sprintf("%sInst.services", service.Name), fmt.Sprintf(`
+type %sServiceImpl struct {
 	mutex    sync.Mutex
 	services map[ruid.RUID]*%s
 }
 
-var _%sService = %sService{services: make(map[ruid.RUID]*%s)}
+var %sInst = %sServiceImpl{services: make(map[ruid.RUID]*%s)}
 
-func %sRegister(server IServer, symbols map[string]uint64) (uint64, *%sService) {
+func %sService(server rpc.IServer, symbols map[string]uint64) (uint64, rpc.Service) {
 	InitializeServer(server, symbols)
-	return SYMBOL_%s, &_%sService
+	return SYMBOL_%s, &%sInst
 }
 
-func (s *%sService) Procedure(i ruid.RUID, method uint64, param []byte) (result []byte, err error) {
+func (s *%sServiceImpl) Procedure(i ruid.RUID, method uint64, param []byte) (result []byte, err error) {
 	var methodName string
 	defer func() {
 		if e := recover(); e != nil {
@@ -236,7 +237,7 @@ func (s *%sService) Procedure(i ruid.RUID, method uint64, param []byte) (result 
 	}
 	return
 }
-`, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
+`, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
 		service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
 		onCreate, serviceTemp, service.Name, onDestroy, service.Name, strings.Join(cases, "")), pkgs
 }

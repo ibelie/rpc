@@ -18,8 +18,25 @@ import (
 	"go/parser"
 	"go/token"
 
+	"github.com/ibelie/ruid"
 	"github.com/ibelie/tygo"
 )
+
+var (
+	SRC_PATH = path.Join(os.Getenv("GOPATH"), "src")
+	PKG_PATH = reflect.TypeOf(Depend{}).PkgPath()
+)
+
+type Service interface {
+	Procedure(ruid.RUID, uint64, []byte) ([]byte, error)
+}
+
+type IServer interface {
+	Distribute(ruid.RUID, ruid.RUID, uint64, uint64, []byte, chan<- []byte) error
+	Procedure(ruid.RUID, ruid.RUID, uint64, uint64, []byte) ([]byte, error)
+}
+
+type Register func(IServer, map[string]uint64) (uint64, Service)
 
 type Depend struct {
 	Path     string
@@ -30,11 +47,6 @@ type Entity struct {
 	Name       string
 	Components []*tygo.Object
 }
-
-var (
-	SRC_PATH = path.Join(os.Getenv("GOPATH"), "src")
-	PKG_PATH = reflect.TypeOf(Depend{}).PkgPath()
-)
 
 func Extract(dir string) (pkgname string, depends []*Depend) {
 	buildPackage, err := build.Import(dir, "", build.ImportComment)

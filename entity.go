@@ -17,7 +17,9 @@ import (
 )
 
 var (
+	RPC_PKG    = map[string]string{"github.com/ibelie/rpc": ""}
 	ENTITY_PKG = map[string]string{
+		"github.com/ibelie/rpc":  "",
 		"github.com/ibelie/ruid": "",
 		"github.com/ibelie/tygo": "",
 	}
@@ -30,16 +32,12 @@ var (
 )
 
 const (
-	SERVER_CODE = `
-type IServer interface {
-	Distribute(ruid.RUID, ruid.RUID, uint64, uint64, []byte, chan<- []byte) error
-	Procedure(ruid.RUID, ruid.RUID, uint64, uint64, []byte) ([]byte, error)
-}
-
-var Server IServer
-var Symbols map[string]uint64
-`
 	ENTITY_CODE = `
+var (
+	Server  rpc.IServer
+	Symbols map[string]uint64
+)
+
 type Entity struct {
 	tygo.Tygo
 	ruid.RUID
@@ -106,7 +104,6 @@ package %s
 `, pkgname)))
 	body.Write([]byte(`
 `))
-	body.Write([]byte(SERVER_CODE))
 	body.Write([]byte(ENTITY_CODE))
 
 	var services []*tygo.Object
@@ -346,7 +343,7 @@ const (%s
 var (%s
 )
 
-func InitializeServer(server IServer, symbols map[string]uint64) {
+func InitializeServer(server rpc.IServer, symbols map[string]uint64) {
 	if Server == nil {
 		Server = server
 	}
@@ -354,7 +351,8 @@ func InitializeServer(server IServer, symbols map[string]uint64) {
 		Symbols = symbols%s
 	}
 }
-`, strings.Join(symbolConst, ""), strings.Join(symbolDeclare, ""), strings.Join(symbolInitialize, "")), nil
+`, strings.Join(symbolConst, ""), strings.Join(symbolDeclare, ""),
+		strings.Join(symbolInitialize, "")), RPC_PKG
 }
 
 func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[string]string) {
