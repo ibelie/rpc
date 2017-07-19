@@ -27,7 +27,6 @@ var (
 		"CREATE",
 		"DESTROY",
 		"SYNCHRON",
-		"NOTIFY",
 	}
 )
 
