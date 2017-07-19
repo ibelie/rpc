@@ -32,7 +32,7 @@ type Service interface {
 }
 
 type IServer interface {
-	Notify(ruid.RUID, ruid.RUID, uint64, []byte) error
+	Notify(ruid.RUID, ruid.RUID, []byte) error
 	Distribute(ruid.RUID, ruid.RUID, uint64, uint64, []byte, chan<- []byte) error
 	Procedure(ruid.RUID, ruid.RUID, uint64, uint64, []byte) ([]byte, error)
 }

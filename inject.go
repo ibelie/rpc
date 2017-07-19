@@ -326,7 +326,7 @@ func (s *%s) append%s(x ...%s) error {
 	}
 	s.%s = append(s.%s, x...)
 	e := s.Entity
-	return Server.Notify(e.RUID, e.Key, e.Type, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
+	return Server.Notify(e.RUID, e.Key, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
 }
 `, service.Name, strings.Title(property.Name), element_s, property.Name, property.Name,
 				property.Name, service.Name, property.Name))
@@ -344,7 +344,7 @@ func (s *%s) update%s(x %s) error {
 		s.%s[k] = v
 	}
 	e := s.Entity
-	return Server.Notify(e.RUID, e.Key, e.Type, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
+	return Server.Notify(e.RUID, e.Key, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
 }
 `, service.Name, strings.Title(property.Name), property_s, property.Name, property.Name,
 				property_s, property.Name, property.Name, service.Name, property.Name))
@@ -355,7 +355,7 @@ func (s *%s) update%s(x %s) error {
 func (s *%s) set%s(x %s) error {
 	s.%s = x
 	e := s.Entity
-	return Server.Notify(e.RUID, e.Key, e.Type, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
+	return Server.Notify(e.RUID, e.Key, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
 }
 `, service.Name, strings.Title(property.Name), property_s, property.Name, property.Name,
 				service.Name, property.Name))
