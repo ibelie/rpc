@@ -167,7 +167,7 @@ ibelie.rpc.Connection = function(url) {
 				entity = new entities.Session();
 				entity.Deserialize(protobuf);
 				entity.connection = conn;
-				entity.Type = ibelie.rpc.Symbols['Session'];
+				entity.Type = ibelie.rpc.Symbols.Session;
 				entity.Key  = 0;
 				conn.entities[id] = entity;
 			} else {
