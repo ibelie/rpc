@@ -49,6 +49,11 @@ type Entity struct {
 	Components []*tygo.Object
 }
 
+func SerializeSession(i ruid.RUID, symbols map[string]uint64, components ...[]byte) (data []byte) {
+	size := tygo.SizeVarint(uint64(i))
+	return nil
+}
+
 func Extract(dir string) (pkgname string, depends []*Depend) {
 	buildPackage, err := build.Import(dir, "", build.ImportComment)
 	if err != nil {

@@ -231,15 +231,19 @@ func (s *%sServiceImpl) Procedure(i ruid.RUID, method uint64, param []byte) (res
 		if service, exist := s.services[i]; !exist {
 			err = fmt.Errorf("[%s] Service synchron RUID not exists: %%v", i)
 		} else {
-			result = make([]byte, service.ByteSize())
-			service.Serialize(&tygo.ProtoBuf{Buffer: result})
+			result = make([]byte, tygo.SizeVarint(SYMBOL_%s) + tygo.SizeVarint(uint64(service.ByteSize())) + service.ByteSize())
+			protobuf := &tygo.ProtoBuf{Buffer: result}
+			protobuf.WriteVarint(SYMBOL_%s)
+			protobuf.WriteVarint(uint64(service.ByteSize()))
+			service.Serialize(protobuf)
 		}%s
 	}
 	return
 }
 `, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
 		service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
-		onCreate, serviceTemp, service.Name, onDestroy, service.Name, strings.Join(cases, "")), pkgs
+		onCreate, serviceTemp, service.Name, onDestroy, service.Name, service.Name,
+		service.Name, strings.Join(cases, "")), pkgs
 }
 
 func injectProcedureCaller(owner string, service string, method *tygo.Method, local string) (string, map[string]string) {

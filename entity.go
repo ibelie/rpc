@@ -16,6 +16,12 @@ import (
 	"github.com/ibelie/tygo"
 )
 
+const (
+	SYMBOL_CREATE uint64 = iota
+	SYMBOL_DESTROY
+	SYMBOL_SYNCHRON
+)
+
 var (
 	RPC_PKG    = map[string]string{"github.com/ibelie/rpc": ""}
 	ENTITY_PKG = map[string]string{
@@ -380,19 +386,17 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 		params_declare = append(params_declare, fmt.Sprintf("rChan chan<- %s", result_s))
 		result = fmt.Sprintf(`
 	if rChan != nil {
-		var err error
 		resultChan := make(chan []byte)
-		go func() {
-			if err = Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_%s, %s, resultChan); err == nil {
-				for result := range resultChan {
-					var r %s
-					r, err = (*%sDelegate)(nil).Deserialize%sResult(result)
-					rChan <- r
-				}
-			}
-			close(rChan)
-		}()
-		return err
+		if err = Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_%s, %s, resultChan); err != nil {
+			return
+		}
+		for result := range resultChan {
+			var r %s
+			r, err = (*%sDelegate)(nil).Deserialize%sResult(result)
+			rChan <- r
+		}
+		close(rChan)
+		return
 	} else {
 		return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_%s, %s, nil)
 	}`, method.Name, param, result_s, service.Name, method.Name, method.Name, param)
@@ -403,7 +407,7 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 	}
 
 	return fmt.Sprintf(`
-func (e *Entity) %s(%s) error {%s
+func (e *Entity) %s(%s) (err error) {%s
 }
 `, method.Name, strings.Join(params_declare, ", "), result), pkgs
 }

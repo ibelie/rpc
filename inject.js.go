@@ -153,11 +153,8 @@ ibelie.rpc.Connection = function(url) {
 		socket.onmessage = function(event) {
 			var entity;
 			var protobuf = tyts.ProtoBuf.FromBase64(event.data);
+			var id = protobuf.ReadVarint();
 			if (!ibelie.rpc.Symbols) {
-				entity = new entities.Session();
-				entity.Deserialize(protobuf);
-				entity.connection = conn;
-				conn.entities[id] = entity;
 				ibelie.rpc.Symbols = {};
 				ibelie.rpc.Dictionary = {};
 				var buffer = new tyts.ProtoBuf(protobuf.ReadBuffer(protobuf.ReadVarint()));
@@ -167,8 +164,13 @@ ibelie.rpc.Connection = function(url) {
 					ibelie.rpc.Symbols[symbol] = value;
 					ibelie.rpc.Dictionary[value] = symbol;
 				}
+				entity = new entities.Session();
+				entity.Deserialize(protobuf);
+				entity.connection = conn;
+				entity.Type = ibelie.rpc.Symbols['Session'];
+				entity.Key  = 0;
+				conn.entities[id] = entity;
 			} else {
-				var id = protobuf.ReadVarint();
 				entity = conn.entities[id];
 				if (!entity) {
 					console.error('[Connection] Cannot find entity:', id);
