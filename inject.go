@@ -183,7 +183,7 @@ type %sServiceImpl struct {
 
 var %sInst = %sServiceImpl{services: make(map[ruid.RUID]*%s)}
 
-func %sService(server rpc.IServer, symbols map[string]uint64) (uint64, rpc.Service) {
+func %sService(server rpc.Server, symbols map[string]uint64) (uint64, rpc.Service) {
 	InitializeServer(server, symbols)
 	return SYMBOL_%s, &%sInst
 }

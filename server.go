@@ -37,13 +37,26 @@ var BUILTIN_SYMBOLS = []string{
 	"IGNORE",
 }
 
+type Connection interface {
+	Address() string
+	Send([]byte) error
+	Receive() ([]byte, error)
+	Close() error
+}
+
+type Network interface {
+	Connect(string) Connection
+	Serve(string, func(Connection))
+}
+
 type Node struct {
 	Address  string
 	Services []uint64
 }
 
-type Server struct {
+type _Server struct {
 	Node
+	Network
 	mutex   sync.Mutex
 	routes  map[uint64]map[uint64]bool
 	symbols map[string]uint64
@@ -54,25 +67,32 @@ type Server struct {
 	local   map[uint64]Service
 }
 
-var ServerInst *Server
+var server *_Server
 
 type Service interface {
 	Procedure(ruid.RUID, uint64, []byte) ([]byte, error)
 }
 
-type IServer interface {
+type Register func(Server, map[string]uint64) (uint64, Service)
+
+type Server interface {
+	Serve()
+	Node() *Node
+	Add(string, *Node)
+	Remove(string)
+	Address() string
+	Register(...*Node)
 	Notify(ruid.RUID, ruid.RUID, []byte) error
 	Distribute(ruid.RUID, ruid.RUID, uint64, uint64, []byte, chan<- []byte) error
 	Procedure(ruid.RUID, ruid.RUID, uint64, uint64, []byte) ([]byte, error)
 	Request(string, ruid.RUID, uint64, uint64, []byte) ([]byte, error)
 }
 
-type Register func(IServer, map[string]uint64) (uint64, Service)
-
-func NewServer(address string, symbols map[string]uint64,
-	routes map[uint64]map[uint64]bool, rs ...Register) *Server {
-	server := &Server{
+func NewServer(address string, symbols map[string]uint64, routes map[uint64]map[uint64]bool,
+	network Network, rs ...Register) Server {
+	server = &Server{
 		Node:    Node{Address: address},
+		Network: network,
 		routes:  routes,
 		symbols: symbols,
 		symdict: make(map[uint64]string),
@@ -85,7 +105,6 @@ func NewServer(address string, symbols map[string]uint64,
 	for symbol, value := range symbols {
 		server.symdict[value] = symbol
 	}
-	ServerInst = server
 
 	for _, r := range rs {
 		i, c := r(server, symbols)
@@ -96,16 +115,12 @@ func NewServer(address string, symbols map[string]uint64,
 	return server
 }
 
-func (s *Server) Gate(address string, gate func(string, func(Gate))) {
-	gate(address, GateInst.handler)
-}
-
-func (s *Server) Notify(i ruid.RUID, k ruid.RUID, p []byte) (err error) {
+func (s *_Server) Notify(i ruid.RUID, k ruid.RUID, p []byte) (err error) {
 	_, err = s.Procedure(i, k, SYMBOL_HUB, SYMBOL_NOTIFY, p)
 	return
 }
 
-func (s *Server) Distribute(i ruid.RUID, k ruid.RUID, t uint64, m uint64, p []byte, r chan<- []byte) error {
+func (s *_Server) Distribute(i ruid.RUID, k ruid.RUID, t uint64, m uint64, p []byte, r chan<- []byte) error {
 	routes, ok := s.routes[t]
 	if !ok {
 		return fmt.Errorf("[Distribute] Unknown entity type: %s(%d)", s.symdict[t], t)
@@ -147,7 +162,7 @@ func (s *Server) Distribute(i ruid.RUID, k ruid.RUID, t uint64, m uint64, p []by
 	}
 }
 
-func (s *Server) Procedure(i ruid.RUID, k ruid.RUID, c uint64, m uint64, p []byte) (r []byte, err error) {
+func (s *_Server) Procedure(i ruid.RUID, k ruid.RUID, c uint64, m uint64, p []byte) (r []byte, err error) {
 	var node string
 	if k == 0 {
 		k = i
@@ -164,7 +179,7 @@ func (s *Server) Procedure(i ruid.RUID, k ruid.RUID, c uint64, m uint64, p []byt
 	return
 }
 
-func (s *Server) Request(node string, i ruid.RUID, c uint64, m uint64, p []byte) (r []byte, err error) {
+func (s *_Server) Request(node string, i ruid.RUID, c uint64, m uint64, p []byte) (r []byte, err error) {
 	// if node == s.Address {
 	// 	if service, ok := s.local[c]; !ok {
 	// 		err = fmt.Errorf("[Request] No local service found: %s(%d) %v %v", s.symdict[c], c, s.Node, s.local)
@@ -262,70 +277,82 @@ func (s *Server) Request(node string, i ruid.RUID, c uint64, m uint64, p []byte)
 	return
 }
 
-// func (s *Server) response(conn net.Conn) {
-// 	var id ruid.RUID
-// 	var service, method, length, step uint64
-// 	var data []byte
-// 	var lenBuf [binary.MaxVarintLen64]byte
-// 	var buffer [BUFFER_SIZE]byte
-// 	defer conn.Close()
-// 	for {
-// 		conn.SetReadDeadline(time.Now().Add(time.Second * READ_DEADLINE))
-// 		if n, err := conn.Read(buffer[:]); err != nil {
-// 			if err == io.EOF || isClosedConnError(err) {
-// 				log.Printf("[MicroServer@%v] Connection lost:\n>>>> %v", s.Address, err)
-// 			} else if e, ok := err.(net.Error); ok && e.Timeout() {
-// 				log.Printf("[MicroServer@%v] Connection timeout:\n>>>> %v", s.Address, e)
-// 			} else {
-// 				log.Printf("[MicroServer@%v] Connection error:\n>>>> %v", s.Address, err)
-// 			}
-// 			return
-// 		} else {
-// 			data = append(data, buffer[:n]...)
-// 		}
-// 		for step < 4 {
-// 			var x, k uint64
-// 			for i, b := range data {
-// 				if b < 0x80 {
-// 					if i > 9 || i == 9 && b > 1 {
-// 						log.Printf("[MicroServer@%v] Request protocol error: %v %v %s(%v) %s(%v) %v %v",
-// 							s.Address, data[:i], id, s.symdict[service], service, s.symdict[method], method, length, step)
-// 						return // overflow
-// 					}
-// 					x |= uint64(b) << k
-// 					data = data[i+1:]
-// 					switch step {
-// 					case 0:
-// 						id = ruid.RUID(x)
-// 					case 1:
-// 						service = x
-// 					case 2:
-// 						method = x
-// 					case 3:
-// 						length = x
-// 					}
-// 					step++
-// 				}
-// 				x |= uint64(b&0x7f) << k
-// 				k += 7
-// 			}
-// 		}
-// 		if step == 4 && uint64(len(data)) >= length {
-// 			param := data[:length]
-// 			data = data[length:]
-// 			if services, ok := s.local[service]; !ok {
-// 				log.Printf("[MicroServer@%v] Service %s(%d) not exists", s.Address, s.symdict[service], service)
-// 			} else if result, err := services.Procedure(id, method, param); err != nil {
-// 				log.Printf("[MicroServer@%v] Procedure error:\n>>>> %v", s.Address, err)
-// 			} else if _, err := conn.Write(append(lenBuf[:binary.PutUvarint(lenBuf[:], uint64(len(result)))], result...)); err != nil {
-// 				log.Printf("[MicroServer@%v] Response error:\n>>>> %v", s.Address, err)
-// 			}
-// 			step = 0
-// 		}
-// 	}
-// }
+func (s *_Server) handler(conn Connection) {
+	var id ruid.RUID
+	var service, method, length, step uint64
+	var data []byte
+	var lenBuf [binary.MaxVarintLen64]byte
+	var buffer [BUFFER_SIZE]byte
+	defer conn.Close()
+	for {
+		conn.SetReadDeadline(time.Now().Add(time.Second * READ_DEADLINE))
+		if n, err := conn.Read(buffer[:]); err != nil {
+			if err == io.EOF || isClosedConnError(err) {
+				log.Printf("[MicroServer@%v] Connection lost:\n>>>> %v", s.Address, err)
+			} else if e, ok := err.(net.Error); ok && e.Timeout() {
+				log.Printf("[MicroServer@%v] Connection timeout:\n>>>> %v", s.Address, e)
+			} else {
+				log.Printf("[MicroServer@%v] Connection error:\n>>>> %v", s.Address, err)
+			}
+			return
+		} else {
+			data = append(data, buffer[:n]...)
+		}
+		for step < 4 {
+			var x, k uint64
+			for i, b := range data {
+				if b < 0x80 {
+					if i > 9 || i == 9 && b > 1 {
+						log.Printf("[MicroServer@%v] Request protocol error: %v %v %s(%v) %s(%v) %v %v",
+							s.Address, data[:i], id, s.symdict[service], service, s.symdict[method], method, length, step)
+						return // overflow
+					}
+					x |= uint64(b) << k
+					data = data[i+1:]
+					switch step {
+					case 0:
+						id = ruid.RUID(x)
+					case 1:
+						service = x
+					case 2:
+						method = x
+					case 3:
+						length = x
+					}
+					step++
+				}
+				x |= uint64(b&0x7f) << k
+				k += 7
+			}
+		}
+		if step == 4 && uint64(len(data)) >= length {
+			param := data[:length]
+			data = data[length:]
+			if services, ok := s.local[service]; !ok {
+				log.Printf("[MicroServer@%v] Service %s(%d) not exists", s.Address, s.symdict[service], service)
+			} else if result, err := services.Procedure(id, method, param); err != nil {
+				log.Printf("[MicroServer@%v] Procedure error:\n>>>> %v", s.Address, err)
+			} else if _, err := conn.Write(append(lenBuf[:binary.PutUvarint(lenBuf[:], uint64(len(result)))], result...)); err != nil {
+				log.Printf("[MicroServer@%v] Response error:\n>>>> %v", s.Address, err)
+			}
+			step = 0
+		}
+	}
+}
 
-func (s *Server) Register(nodes ...*Node) {
+func (s *_Server) Serve() {
+	s.Network.Serve(s.Address, s.handler)
+}
+
+func (s *_Server) Node() *Node {
+
+}
+
+func (s *_Server) Address() string {
+
+}
+
+func (s *_Server) Register(nodes ...*Node) {
 	for _, node := range nodes {
 		for _, service := range node.Services {
 			if ring, ok := s.remote[service]; ok {
@@ -338,7 +365,7 @@ func (s *Server) Register(nodes ...*Node) {
 	}
 }
 
-func (s *Server) Add(key string, node *Node) {
+func (s *_Server) Add(key string, node *Node) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	for _, service := range node.Services {
@@ -351,7 +378,7 @@ func (s *Server) Add(key string, node *Node) {
 	s.nodes[key] = node
 }
 
-func (s *Server) Remove(key string) {
+func (s *_Server) Remove(key string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	if node, ok := s.nodes[key]; ok {

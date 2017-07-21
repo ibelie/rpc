@@ -14,7 +14,7 @@ import (
 	"github.com/ibelie/tygo"
 )
 
-type Gate interface {
+type IGate interface {
 	Address() string
 	Send([]byte) error
 	Receive() ([]byte, error)
@@ -23,13 +23,17 @@ type Gate interface {
 
 type GateImpl struct {
 	mutex sync.Mutex
-	gates map[ruid.RUID]Gate
+	gates map[ruid.RUID]IGate
 }
 
-var GateInst = GateImpl{gates: make(map[ruid.RUID]Gate)}
+var GateInst = GateImpl{gates: make(map[ruid.RUID]IGate)}
 
-func GateService(server IServer, symbols map[string]uint64) (uint64, Service) {
+func GateService(_ Server, _ map[string]uint64) (uint64, Service) {
 	return SYMBOL_GATE, &GateInst
+}
+
+func Gate(address string, gate func(string, func(IGate))) {
+	gate(address, GateInst.handler)
 }
 
 func (s *GateImpl) observe(i ruid.RUID, k ruid.RUID, t uint64, session ruid.RUID) (components [][]byte, err error) {
@@ -50,7 +54,7 @@ func (s *GateImpl) ignore(i ruid.RUID, k ruid.RUID, session ruid.RUID) (err erro
 	return
 }
 
-func (s *GateImpl) handler(gate Gate) {
+func (s *GateImpl) handler(gate IGate) {
 	session := ruid.New()
 	if err := ServerInst.Distribute(session, 0, SYMBOL_SESSION, SYMBOL_CREATE, []byte{0, byte(SYMBOL_SESSION)}, nil); err != nil {
 		log.Printf("[Gate@%v] Create session error %v %v:\n>>>> %v", ServerInst.Address, gate.Address(), session, err)

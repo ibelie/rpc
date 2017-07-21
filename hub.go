@@ -19,7 +19,7 @@ type HubImpl struct {
 
 var HubInst = HubImpl{observers: make(map[ruid.RUID]map[string]map[ruid.RUID]bool)}
 
-func HubService(server IServer, symbols map[string]uint64) (uint64, Service) {
+func HubService(_ Server, _ map[string]uint64) (uint64, Service) {
 	return SYMBOL_HUB, &HubInst
 }
 

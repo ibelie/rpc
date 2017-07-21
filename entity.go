@@ -28,7 +28,7 @@ var (
 const (
 	ENTITY_CODE = `
 var (
-	Server  rpc.IServer
+	Server  rpc.Server
 	Symbols map[string]uint64
 )
 
@@ -337,7 +337,7 @@ const (%s
 var (%s
 )
 
-func InitializeServer(server rpc.IServer, symbols map[string]uint64) {
+func InitializeServer(server rpc.Server, symbols map[string]uint64) {
 	if Server == nil {
 		Server = server
 	}
