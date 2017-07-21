@@ -227,10 +227,11 @@ func (s *%sServiceImpl) Procedure(i ruid.RUID, method uint64, param []byte) (res
 		if service, exist := s.services[i]; !exist {
 			err = fmt.Errorf("[%s] Service synchron RUID not exists: %%v", i)
 		} else {
-			result = make([]byte, tygo.SizeVarint(SYMBOL_%s) + tygo.SizeVarint(uint64(service.ByteSize())) + service.ByteSize())
+			size := service.ByteSize()
+			result = make([]byte, tygo.SizeVarint(SYMBOL_%s) + tygo.SizeVarint(uint64(size)) + size)
 			output := &tygo.ProtoBuf{Buffer: result}
 			output.WriteVarint(SYMBOL_%s)
-			output.WriteVarint(uint64(service.ByteSize()))
+			output.WriteVarint(uint64(size))
 			service.Serialize(output)
 		}%s
 	}
