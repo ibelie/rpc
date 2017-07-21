@@ -180,7 +180,12 @@ ibelie.rpc.Connection = function(url) {
 			while (!protobuf.End()) {
 				var name = ibelie.rpc.Dictionary[protobuf.ReadVarint()];
 				var data = protobuf.ReadBuffer(protobuf.ReadVarint());
-				if (name == 'NOTIFY') {
+				if (ibelie.rpc[name]) {
+					ibelie.rpc[name].prototype.Deserialize.call(entity[name], data);
+				} else if (!entity.isAwake) {
+					console.error('[Connection] Entity is not awake:', id, name, entity);
+					continue;
+				} else if (name == 'NOTIFY') {
 					var component;
 					var property;
 					var buffer = new tyts.ProtoBuf(data);
@@ -221,8 +226,6 @@ ibelie.rpc.Connection = function(url) {
 						entity[component][property] = newValue;
 						handler && handler(oldValue, newValue);
 					}
-				} else if (ibelie.rpc[name]) {
-					ibelie.rpc[name].prototype.Deserialize.call(entity[name], data.subarray(1));
 				} else {
 					var args = entity['Deserialize' + name](data);
 					for (var k in entity) {

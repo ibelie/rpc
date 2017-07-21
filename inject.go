@@ -196,7 +196,7 @@ func (s *%sServiceImpl) Procedure(i ruid.RUID, method uint64, param []byte) (res
 	var methodName string
 	defer func() {
 		if e := recover(); e != nil {
-			err = fmt.Errorf("[%s] Procedure %%d(%%s) %%v panic:\n>>>>%%v", method, methodName, i, e)
+			err = fmt.Errorf("[%s] Procedure %%s(%%d) %%v panic:\n>>>> %%v", methodName, method, i, e)
 		}
 	}()
 
@@ -298,7 +298,7 @@ func injectProcedureCaller(owner string, service string, method *tygo.Method, lo
 		checkLocal = fmt.Sprintf(`
 	defer func() {
 		if e := recover(); e != nil {
-			err = fmt.Errorf("[%s] Procedure %s panic:\n>>>>%%v", e)
+			err = fmt.Errorf("[%s] Procedure %s panic:\n>>>> %%v", e)
 		}
 	}()
 	if local, exist := %s[s.RUID]; exist {%s

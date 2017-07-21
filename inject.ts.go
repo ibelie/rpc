@@ -20,7 +20,7 @@ import (
 func Typescript(input string, tsOut string) []*Entity {
 	text, err := ioutil.ReadFile(input)
 	if err != nil {
-		log.Fatalf("[RPC][Typescript] Cannot read file:\n>>>>%v", err)
+		log.Fatalf("[RPC][Typescript] Cannot read file:\n>>>> %v", err)
 		return nil
 	}
 

@@ -55,7 +55,7 @@ func SerializeSession(i ruid.RUID, symbols map[string]uint64, components ...[]by
 		symbol := []byte(name)
 		symbolsSize += tygo.SizeVarint(uint64(len(symbol))) + len(symbol) + tygo.SizeVarint(value)
 	}
-	size := symbolsSize + tygo.SizeVarint(symbolsSize) + tygo.SizeVarint(uint64(i))
+	size := symbolsSize + tygo.SizeVarint(uint64(symbolsSize)) + tygo.SizeVarint(uint64(i))
 	for _, component := range components {
 		size += len(component)
 	}
@@ -77,14 +77,14 @@ func SerializeSession(i ruid.RUID, symbols map[string]uint64, components ...[]by
 func Extract(dir string) (pkgname string, depends []*Depend) {
 	buildPackage, err := build.Import(dir, "", build.ImportComment)
 	if err != nil {
-		log.Fatalf("[RPC][Entity] Cannot import package:\n>>>>%v", err)
+		log.Fatalf("[RPC][Entity] Cannot import package:\n>>>> %v", err)
 		return
 	}
 	fs := token.NewFileSet()
 	for _, filename := range buildPackage.GoFiles {
 		file, err := parser.ParseFile(fs, path.Join(buildPackage.Dir, filename), nil, parser.ParseComments)
 		if err != nil {
-			log.Fatalf("[RPC][Entity] Cannot parse file:\n>>>>%v", err)
+			log.Fatalf("[RPC][Entity] Cannot parse file:\n>>>> %v", err)
 		}
 		pkgname = file.Name.Name
 		for _, d := range file.Decls {
@@ -253,7 +253,7 @@ func resolveEntities(entityMap map[string]map[string][]string) (entities []*Enti
 		componentMap := make(map[string]*tygo.Object)
 		for pkg, names := range entityMap[n] {
 			if _, err := build.Import(pkg, "", build.ImportComment); err != nil {
-				log.Printf("[RPC][Entity] Ignore component:\n>>>>%v", err)
+				log.Printf("[RPC][Entity] Ignore component:\n>>>> %v", err)
 				continue
 			}
 			for _, typ := range tygo.Extract(pkg, ReplaceEntity) {
