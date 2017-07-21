@@ -9,9 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ibelie/rpc"
 	"github.com/ibelie/ruid"
-	"github.com/ibelie/tygo"
 )
 
 type HubImpl struct {
@@ -21,7 +19,7 @@ type HubImpl struct {
 
 var HubInst = HubImpl{observers: make(map[ruid.RUID]map[string]map[ruid.RUID]bool)}
 
-func HubService(server rpc.IServer, symbols map[string]uint64) (uint64, rpc.Service) {
+func HubService(server IServer, symbols map[string]uint64) (uint64, Service) {
 	return SYMBOL_HUB, &HubInst
 }
 

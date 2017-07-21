@@ -31,7 +31,7 @@ var (
 	DELEGATE = "Delegate"
 )
 
-func ReplaceEntity(dir string, filename string, pkgname string, types []tygo.Type) {
+func ReplaceEntity(dir string, filename string, pkgname string, types []tygo.Type, _ []tygo.Type, _ string) {
 	for _, t := range types {
 		if object, ok := isService(t); ok {
 			object.Parent.Object = &tygo.Object{
@@ -42,19 +42,15 @@ func ReplaceEntity(dir string, filename string, pkgname string, types []tygo.Typ
 	}
 }
 
-func Inject(dir string, filename string, pkgname string, types []tygo.Type) {
-	ReplaceEntity(dir, filename, pkgname, types)
+func Inject(dir string, filename string, pkgname string, types []tygo.Type, _ []tygo.Type, _ string) {
+	ReplaceEntity(dir, filename, pkgname, types, nil, "")
 	var services []*tygo.Object
 	for _, t := range types {
 		if object, ok := isService(t); ok {
 			services = append(services, object)
 		}
 	}
-	tygo.PROP_PRE = PROP_PRE
-	tygo.DELEGATE = DELEGATE
-	tygo.Inject(dir, filename, pkgname, types)
-	tygo.PROP_PRE = nil
-	tygo.DELEGATE = ""
+	tygo.Inject(dir, filename, pkgname, types, PROP_PRE, DELEGATE)
 	injectfile := path.Join(SRC_PATH, dir, strings.Replace(filename, ".go", ".rpc.go", 1))
 	if len(services) == 0 {
 		os.Remove(injectfile)

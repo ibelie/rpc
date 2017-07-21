@@ -185,27 +185,10 @@ ibelie.rpc.Connection = function(url) {
 					console.error('[Connection] Entity is not awake:', id, name, entity);
 					continue;
 				} else if (name == 'NOTIFY') {
-					var component;
-					var property;
 					var buffer = new tyts.ProtoBuf(data);
-					while (!buffer.End()) {
-						var tag_cutoff = buffer.ReadTag(127);
-						var i = (tag_cutoff[0] >> tyts.WireTypeBits) - 1;
-						if (tag_cutoff[1] && (i == 1 || i == 2) &&
-							(tag_cutoff[0] & tyts.WireTypeMask) == tyts.WireVarint) {
-							if (i == 1) {
-								component = ibelie.rpc.Dictionary[buffer.ReadVarint()];
-							} else {
-								property = ibelie.rpc.Dictionary[buffer.ReadVarint()];
-							}
-							continue;
-						}
-						if (!tag_cutoff[0]) {
-							break;
-						}
-						buffer.SkipField(tag_cutoff[0]);
-					}
-					var newValue = ibelie.rpc[component]['Deserialize' + property](data)[2];
+					var component = ibelie.rpc.Dictionary[buffer.ReadVarint()];
+					var property = ibelie.rpc.Dictionary[buffer.ReadVarint()];
+					var newValue = ibelie.rpc[component]['Deserialize' + property](buffer.Bytes())[0];
 					var oldValue = entity[component][property];
 					var handler = entity[component][property + 'Handler'];
 					if (oldValue.concat) {
