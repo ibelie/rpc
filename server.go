@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/ibelie/ruid"
+	"github.com/ibelie/tygo"
 )
 
 const (
@@ -50,8 +51,8 @@ type Network interface {
 }
 
 type Node struct {
-	Address  string
-	Services []uint64
+	Addr string
+	Srvs []uint64
 }
 
 type _Server struct {
@@ -77,7 +78,7 @@ type Register func(Server, map[string]uint64) (uint64, Service)
 
 type Server interface {
 	Serve()
-	Node() *Node
+	GetNode() *Node
 	Add(string, *Node)
 	Remove(string)
 	Address() string
@@ -85,13 +86,13 @@ type Server interface {
 	Notify(ruid.RUID, ruid.RUID, []byte) error
 	Distribute(ruid.RUID, ruid.RUID, uint64, uint64, []byte, chan<- []byte) error
 	Procedure(ruid.RUID, ruid.RUID, uint64, uint64, []byte) ([]byte, error)
-	Request(string, ruid.RUID, uint64, uint64, []byte) ([]byte, error)
+	Request(string, ruid.RUID, uint64, []byte, ...uint64) ([][]byte, error)
 }
 
 func NewServer(address string, symbols map[string]uint64, routes map[uint64]map[uint64]bool,
 	network Network, rs ...Register) Server {
-	server = &Server{
-		Node:    Node{Address: address},
+	server = &_Server{
+		Node:    Node{Addr: address},
 		Network: network,
 		routes:  routes,
 		symbols: symbols,
@@ -108,7 +109,7 @@ func NewServer(address string, symbols map[string]uint64, routes map[uint64]map[
 
 	for _, r := range rs {
 		i, c := r(server, symbols)
-		server.Services = append(server.Services, i)
+		server.Srvs = append(server.Srvs, i)
 		server.remote[i] = ruid.NewRing(address)
 		server.local[i] = c
 	}
@@ -120,259 +121,200 @@ func (s *_Server) Notify(i ruid.RUID, k ruid.RUID, p []byte) (err error) {
 	return
 }
 
-func (s *_Server) Distribute(i ruid.RUID, k ruid.RUID, t uint64, m uint64, p []byte, r chan<- []byte) error {
-	routes, ok := s.routes[t]
-	if !ok {
-		return fmt.Errorf("[Distribute] Unknown entity type: %s(%d)", s.symdict[t], t)
-	}
-	if r != nil {
-		go func() {
-			for c, ok := range routes {
-				if cs, exist := s.routes[m]; exist {
-					if ok, exist := cs[c]; !ok || !exist {
-						continue
-					}
-				}
-				if !ok {
-					continue
-				} else if d, e := s.Procedure(i, k, c, m, p); e != nil {
-					log.Printf("[MicroServer@%v] Distribute error:\n>>>> %v", s.Address, e)
-				} else {
-					r <- d
-				}
-			}
-			close(r)
-		}()
-		return nil
+func (s *_Server) Distribute(i ruid.RUID, k ruid.RUID, t uint64, m uint64, p []byte, r chan<- []byte) (err error) {
+	var errors []string
+	services := make(map[string][]uint64)
+
+	if routes, ok := s.routes[t]; !ok {
+		return fmt.Errorf("[Distribute] Unknown entity type: %s(%v)", s.symdict[t], t)
 	} else {
-		var errors []string
 		for c, ok := range routes {
-			if cs, exist := s.routes[m]; exist {
+			if !ok {
+				continue
+			} else if cs, exist := s.routes[m]; exist {
 				if ok, exist := cs[c]; !ok || !exist {
 					continue
 				}
 			}
-			if !ok {
-				continue
-			} else if _, e := s.Procedure(i, k, c, m, p); e != nil {
-				errors = append(errors, fmt.Sprintf("\n>>>> service: %s(%v)\n>>>> %v", s.symdict[c], c, e))
+			if ring, ok := s.remote[c]; !ok {
+				errors = append(errors, fmt.Sprintf("\n>>>> Unknown service type: %s(%v)", s.symdict[c], c))
+			} else if node, ok := ring.Get(k); !ok {
+				errors = append(errors, fmt.Sprintf("\n>>>> No service found: %s(%v) %v %v", s.symdict[c], c, s.Node, s.nodes))
+			} else {
+				services[node] = append(services[node], c)
 			}
 		}
-		return fmt.Errorf("[Distribute] %s(%v:%v) %s(%v) errors:%s", s.symdict[t], i, k, s.symdict[m], m, strings.Join(errors, ""))
 	}
+	if r == nil {
+		for node, c := range services {
+			if _, e := s.Request(node, i, m, p, c...); e != nil {
+				errors = append(errors, fmt.Sprintf("\n>>>> Request error: %v %v\n>>>> %v", node, c, e))
+			}
+		}
+	} else if len(errors) == 0 {
+		go func() {
+			for node, c := range services {
+				if rs, e := s.Request(node, i, m, p, c...); e != nil {
+					log.Printf("[Server@%v] Distribute error: %v %v\n>>>> %v", s.Addr, node, c, e)
+				} else {
+					for _, d := range rs {
+						r <- d
+					}
+				}
+			}
+			close(r)
+		}()
+	}
+	if len(errors) > 0 {
+		err = fmt.Errorf("[Distribute] %s(%v:%v) %s(%v) errors:%s", s.symdict[t], i, k, s.symdict[m], m, strings.Join(errors, ""))
+	}
+	return
 }
 
 func (s *_Server) Procedure(i ruid.RUID, k ruid.RUID, c uint64, m uint64, p []byte) (r []byte, err error) {
-	var node string
 	if k == 0 {
 		k = i
 	}
 
 	if ring, ok := s.remote[c]; !ok {
-		err = fmt.Errorf("[Procedure] Unknown service type: %s(%d)", s.symdict[c], c)
-		return
-	} else if node, ok = ring.Get(k); !ok {
-		err = fmt.Errorf("[Procedure] No service found: %s(%d) %v %v", s.symdict[c], c, s.Node, s.nodes)
-		return
+		err = fmt.Errorf("[Procedure] Unknown service type: %s(%v)", s.symdict[c], c)
+	} else if node, ok := ring.Get(k); !ok {
+		err = fmt.Errorf("[Procedure] No service found: %s(%v) %v %v", s.symdict[c], c, s.Node, s.nodes)
+	} else if rs, e := s.Request(node, i, m, p, c); e != nil || len(rs) <= 0 {
+		err = e
+	} else {
+		r = rs[0]
 	}
-	r, err = s.Request(node, i, c, m, p)
 	return
 }
 
-func (s *_Server) Request(node string, i ruid.RUID, c uint64, m uint64, p []byte) (r []byte, err error) {
-	// if node == s.Address {
-	// 	if service, ok := s.local[c]; !ok {
-	// 		err = fmt.Errorf("[Request] No local service found: %s(%d) %v %v", s.symdict[c], c, s.Node, s.local)
-	// 	} else {
-	// 		r, err = service.Procedure(i, m, p)
-	// 	}
-	// 	return
-	// }
+func (s *_Server) Request(node string, i ruid.RUID, m uint64, p []byte, cs ...uint64) (rs [][]byte, err error) {
+	var errors []string
+	if node == s.Addr {
+		for _, c := range cs {
+			if service, ok := s.local[c]; !ok {
+				errors = append(errors, fmt.Sprintf("\n>>>> No local service found: %s(%v) %v %v", s.symdict[c], c, s.Node, s.local))
+			} else if r, e := service.Procedure(i, m, p); e != nil {
+				errors = append(errors, fmt.Sprintf("\n>>>> Procedure %s(%v) error\n>>>> %v", s.symdict[c], c, e))
+			} else {
+				rs = append(rs, r)
+			}
+		}
+		goto request_end
+	}
 
-	// if _, ok := s.conns[node]; !ok {
-	// 	s.mutex.Lock()
-	// 	s.conns[node] = &sync.Pool{New: func() interface{} {
-	// 		if conn, err := net.DialTimeout("tcp", node, CONN_DEADLINE*time.Second); err != nil {
-	// 			log.Printf("[MicroServer@%v] Connection failed: %s\n>>>> %v", s.Address, node, err)
-	// 			return nil
-	// 		} else {
-	// 			return conn
-	// 		}
-	// 	}}
-	// 	s.mutex.Unlock()
-	// }
+	if _, ok := s.conns[node]; !ok {
+		s.mutex.Lock()
+		s.conns[node] = &sync.Pool{New: func() interface{} {
+			return s.Network.Connect(node)
+		}}
+		s.mutex.Unlock()
+	}
 
-	// var n int
-	// var length uint64
-	// var hasLength bool
-	// var header [binary.MaxVarintLen64 * 4]byte
-	// var buffer [BUFFER_SIZE]byte
-	// buflen := binary.PutUvarint(header[:], uint64(i))
-	// buflen += binary.PutUvarint(header[buflen:], c)
-	// buflen += binary.PutUvarint(header[buflen:], m)
-	// buflen += binary.PutUvarint(header[buflen:], uint64(len(p)))
-	// param := append(header[:buflen], p...)
+	for j := 0; j < 10; j++ {
+		if o := s.conns[node].Get(); o == nil {
+			continue
+		} else if conn, ok := o.(Connection); !ok {
+			log.Printf("[Server@%v] Connection pool type error: %v", s.Addr, o)
+			continue
+		} else if e := conn.Send(SerializeRequest(i, cs, m, p)); e != nil {
+			errors = append(errors, fmt.Sprintf("\n>>>> Connection retry: %d\n>>>> %v", j, e))
+		} else {
+			ds, e := conn.Receive()
+			if e != nil {
+				err = fmt.Errorf("[Request] Receive response error:\n>>>> %v", err)
+				return
+			}
+			s.conns[node].Put(conn)
+			input := &tygo.ProtoBuf{Buffer: ds}
+			for !input.ExpectEnd() {
+				if r, e := input.ReadBuf(); e != nil {
+					err = fmt.Errorf("[Request] Response deserialize error:\n>>>> %v", e)
+					return
+				} else {
+					rs = append(rs, r)
+				}
+			}
+			return
+		}
+	}
 
-	// for j := 0; j < 3; j++ {
-	// 	if o := s.conns[node].Get(); o == nil {
-	// 		continue
-	// 	} else if conn, ok := o.(net.Conn); !ok {
-	// 		log.Printf("[MicroServer@%v] Connection pool type error: %v", s.Address, o)
-	// 		continue
-	// 	} else if err = conn.SetWriteDeadline(time.Now().Add(time.Second * WRITE_DEADLINE)); err != nil {
-	// 	} else if _, err = conn.Write(param); err != nil {
-	// 	} else {
-	// 		var result []byte
-	// 		for {
-	// 			if n, err = conn.Read(buffer[:]); err != nil {
-	// 				if err == io.EOF || isClosedConnError(err) {
-	// 					err = fmt.Errorf("[Request] Connection lost:\n>>>> %v", err)
-	// 				} else if e, ok := err.(net.Error); ok && e.Timeout() {
-	// 					err = fmt.Errorf("[Request] Connection timeout:\n>>>> %v", e)
-	// 				} else {
-	// 					err = fmt.Errorf("[Request] Connection error:\n>>>> %v", err)
-	// 				}
-	// 				return
-	// 			} else {
-	// 				result = append(result, buffer[:n]...)
-	// 			}
-	// 			if !hasLength {
-	// 				length = 0
-	// 				var k uint
-	// 				for l, b := range result {
-	// 					if b < 0x80 {
-	// 						if l > 9 || l == 9 && b > 1 {
-	// 							err = fmt.Errorf("[Request] Response protocol error: %v %v",
-	// 								result[:l], length)
-	// 							return
-	// 						}
-	// 						length |= uint64(b) << k
-	// 						result = result[l+1:]
-	// 						hasLength = true
-	// 					}
-	// 					length |= uint64(b&0x7f) << k
-	// 					k += 7
-	// 				}
-	// 			}
-	// 			if hasLength && uint64(len(result)) >= length {
-	// 				if r = result[:length]; uint64(len(result)) > length {
-	// 					log.Printf("[MicroServer@%v] Ignore response data: %v", s.Address, result)
-	// 				}
-	// 				break
-	// 			}
-	// 		}
-	// 		s.conns[node].Put(conn)
-	// 		break
-	// 	}
-
-	// 	if err != nil {
-	// 		if err == io.EOF || isClosedConnError(err) {
-	// 		} else if e, ok := err.(net.Error); ok && e.Timeout() {
-	// 		} else {
-	// 			log.Printf("[MicroServer@%v] Request retry:\n>>>> %v", s.Address, err)
-	// 		}
-	// 	}
-	// }
-
+request_end:
+	if len(errors) > 0 {
+		err = fmt.Errorf("[Request] %s %v %s(%v) errors:%s", node, i, s.symdict[m], m, strings.Join(errors, ""))
+	}
 	return
 }
 
 func (s *_Server) handler(conn Connection) {
-	var id ruid.RUID
-	var service, method, length, step uint64
-	var data []byte
-	var lenBuf [binary.MaxVarintLen64]byte
-	var buffer [BUFFER_SIZE]byte
 	defer conn.Close()
 	for {
-		conn.SetReadDeadline(time.Now().Add(time.Second * READ_DEADLINE))
-		if n, err := conn.Read(buffer[:]); err != nil {
-			if err == io.EOF || isClosedConnError(err) {
-				log.Printf("[MicroServer@%v] Connection lost:\n>>>> %v", s.Address, err)
-			} else if e, ok := err.(net.Error); ok && e.Timeout() {
-				log.Printf("[MicroServer@%v] Connection timeout:\n>>>> %v", s.Address, e)
-			} else {
-				log.Printf("[MicroServer@%v] Connection error:\n>>>> %v", s.Address, err)
-			}
-			return
+		if data, err := conn.Receive(); err != nil {
+			log.Printf("[Server@%v] Connection error:\n>>>> %v", s.Addr, err)
+			break
+		} else if i, cs, m, p, err := DeserializeRequest(data); err != nil {
+			log.Printf("[Server@%v] Deserialize request error:\n>>>> %v", s.Addr, err)
 		} else {
-			data = append(data, buffer[:n]...)
-		}
-		for step < 4 {
-			var x, k uint64
-			for i, b := range data {
-				if b < 0x80 {
-					if i > 9 || i == 9 && b > 1 {
-						log.Printf("[MicroServer@%v] Request protocol error: %v %v %s(%v) %s(%v) %v %v",
-							s.Address, data[:i], id, s.symdict[service], service, s.symdict[method], method, length, step)
-						return // overflow
-					}
-					x |= uint64(b) << k
-					data = data[i+1:]
-					switch step {
-					case 0:
-						id = ruid.RUID(x)
-					case 1:
-						service = x
-					case 2:
-						method = x
-					case 3:
-						length = x
-					}
-					step++
+			var rs [][]byte
+			for _, c := range cs {
+				if service, ok := s.local[c]; !ok {
+					log.Printf("[Server@%v] Service %s(%v) not exists", s.Addr, s.symdict[c], c)
+				} else if r, err := service.Procedure(i, m, p); err != nil {
+					log.Printf("[Server@%v] Procedure %s(%v) error:\n>>>> %v", s.Addr, s.symdict[c], c, err)
+				} else {
+					rs = append(rs, r)
 				}
-				x |= uint64(b&0x7f) << k
-				k += 7
 			}
-		}
-		if step == 4 && uint64(len(data)) >= length {
-			param := data[:length]
-			data = data[length:]
-			if services, ok := s.local[service]; !ok {
-				log.Printf("[MicroServer@%v] Service %s(%d) not exists", s.Address, s.symdict[service], service)
-			} else if result, err := services.Procedure(id, method, param); err != nil {
-				log.Printf("[MicroServer@%v] Procedure error:\n>>>> %v", s.Address, err)
-			} else if _, err := conn.Write(append(lenBuf[:binary.PutUvarint(lenBuf[:], uint64(len(result)))], result...)); err != nil {
-				log.Printf("[MicroServer@%v] Response error:\n>>>> %v", s.Address, err)
+			var size int
+			for _, r := range rs {
+				size += tygo.SizeVarint(uint64(len(r))) + len(r)
 			}
-			step = 0
+			result := make([]byte, size)
+			output := &tygo.ProtoBuf{Buffer: result}
+			for _, r := range rs {
+				output.WriteVarint(uint64(len(r)))
+				output.Write(r)
+			}
+			if err := conn.Send(result); err != nil {
+				log.Printf("[Server@%v] Response error:\n>>>> %v", s.Addr, err)
+			}
 		}
 	}
 }
 
 func (s *_Server) Serve() {
-	s.Network.Serve(s.Address, s.handler)
+	s.Network.Serve(s.Addr, s.handler)
 }
 
-func (s *_Server) Node() *Node {
-
+func (s *_Server) GetNode() *Node {
+	return &s.Node
 }
 
 func (s *_Server) Address() string {
-
+	return s.Addr
 }
 
 func (s *_Server) Register(nodes ...*Node) {
 	for _, node := range nodes {
-		for _, service := range node.Services {
+		for _, service := range node.Srvs {
 			if ring, ok := s.remote[service]; ok {
-				ring.Append(node.Address)
+				ring.Append(node.Addr)
 			} else {
-				s.remote[service] = ruid.NewRing(node.Address)
+				s.remote[service] = ruid.NewRing(node.Addr)
 			}
 		}
-		s.nodes[node.Address] = node
+		s.nodes[node.Addr] = node
 	}
 }
 
 func (s *_Server) Add(key string, node *Node) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	for _, service := range node.Services {
+	for _, service := range node.Srvs {
 		if ring, ok := s.remote[service]; ok {
-			ring.Append(node.Address)
+			ring.Append(node.Addr)
 		} else {
-			s.remote[service] = ruid.NewRing(node.Address)
+			s.remote[service] = ruid.NewRing(node.Addr)
 		}
 	}
 	s.nodes[key] = node
@@ -382,9 +324,48 @@ func (s *_Server) Remove(key string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	if node, ok := s.nodes[key]; ok {
-		for _, service := range node.Services {
-			s.remote[service].Remove(node.Address)
+		for _, service := range node.Srvs {
+			s.remote[service].Remove(node.Addr)
 		}
 	}
 	delete(s.nodes, key)
+}
+
+func SerializeRequest(i ruid.RUID, ss []uint64, m uint64, p []byte) (data []byte) {
+	var size int
+	for _, s := range ss {
+		size += tygo.SizeVarint(s)
+	}
+	data = make([]byte, tygo.SizeVarint(uint64(i))+tygo.SizeVarint(m)+tygo.SizeVarint(uint64(size))+size+len(p))
+	output := &tygo.ProtoBuf{Buffer: data}
+	output.WriteVarint(uint64(i))
+	output.WriteVarint(m)
+	output.WriteVarint(uint64(size))
+	for _, s := range ss {
+		output.WriteVarint(s)
+	}
+	output.Write(p)
+	return
+}
+
+func DeserializeRequest(data []byte) (i ruid.RUID, ss []uint64, m uint64, p []byte, err error) {
+	var id uint64
+	input := &tygo.ProtoBuf{Buffer: data}
+	if id, err = input.ReadVarint(); err != nil {
+	} else if m, err = input.ReadVarint(); err != nil {
+	} else if p, err = input.ReadBuf(); err != nil {
+	} else {
+		i = ruid.RUID(id)
+		buffer := &tygo.ProtoBuf{Buffer: p}
+		for !buffer.ExpectEnd() {
+			if s, e := buffer.ReadVarint(); e != nil {
+				err = e
+				break
+			} else {
+				ss = append(ss, s)
+			}
+		}
+		p = input.Bytes()
+	}
+	return
 }

@@ -192,7 +192,7 @@ func (s *%sServiceImpl) Procedure(i ruid.RUID, method uint64, param []byte) (res
 	var methodName string
 	defer func() {
 		if e := recover(); e != nil {
-			err = fmt.Errorf("[%s] Procedure %%s(%%d) %%v panic:\n>>>> %%v", methodName, method, i, e)
+			err = fmt.Errorf("[%s] Procedure %%s(%%v) %%v panic:\n>>>> %%v", methodName, method, i, e)
 		}
 	}()
 

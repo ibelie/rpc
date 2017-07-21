@@ -69,11 +69,11 @@ func (s *HubImpl) Procedure(i ruid.RUID, method uint64, param []byte) (result []
 				errors = append(errors, fmt.Sprintf("\n>>>> [Hub] Dispatch gate no observer %v %v", i, gate))
 				continue
 			}
-			if _, err = ServerInst.Request(gate, i, SYMBOL_GATE, method, SerializeDispatch(observers, param)); err != nil {
+			if _, err = server.Request(gate, i, method, SerializeDispatch(observers, param), SYMBOL_GATE); err != nil {
 				errors = append(errors, fmt.Sprintf("\n>>>> gate: %v\n>>>> %v", gate, err))
 			}
 		}
-		err = fmt.Errorf("[Hub] Dispatch errors %v %s(%v):%s", i, ServerInst.symdict[method], method, strings.Join(errors, ""))
+		err = fmt.Errorf("[Hub] Dispatch errors %v %s(%v):%s", i, server.symdict[method], method, strings.Join(errors, ""))
 	}
 	return
 }
