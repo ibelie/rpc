@@ -37,13 +37,9 @@ func Gate(address string, gate func(string, func(IGate))) {
 }
 
 func (s *GateImpl) observe(i ruid.RUID, k ruid.RUID, t uint64, session ruid.RUID) (components [][]byte, err error) {
-	comChan := make(chan []byte)
-	if err = server.Distribute(i, k, t, SYMBOL_SYNCHRON, nil, comChan); err != nil {
+	if components, err = server.Distribute(i, k, t, SYMBOL_SYNCHRON, nil); err != nil {
 		err = fmt.Errorf("[Gate] Synchron %s(%v:%v) error %v:\n>>>> %v", server.symdict[t], i, k, session, err)
 		return
-	}
-	for component := range comChan {
-		components = append(components, component)
 	}
 	_, err = server.Procedure(i, k, SYMBOL_HUB, SYMBOL_OBSERVE, SerializeSessionGate(session, server.Addr))
 	return
@@ -56,7 +52,7 @@ func (s *GateImpl) ignore(i ruid.RUID, k ruid.RUID, session ruid.RUID) (err erro
 
 func (s *GateImpl) handler(gate IGate) {
 	session := ruid.New()
-	if err := server.Distribute(session, 0, SYMBOL_SESSION, SYMBOL_CREATE, []byte{0, byte(SYMBOL_SESSION)}, nil); err != nil {
+	if _, err := server.Distribute(session, 0, SYMBOL_SESSION, SYMBOL_CREATE, []byte{0, byte(SYMBOL_SESSION)}); err != nil {
 		log.Printf("[Gate@%v] Create session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 	} else if components, err := s.observe(session, 0, SYMBOL_SESSION, session); err != nil {
 		log.Printf("[Gate@%v] Observe session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
@@ -100,7 +96,7 @@ func (s *GateImpl) handler(gate IGate) {
 					log.Printf("[Gate@%v] Ignore %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], ruid.RUID(i), ruid.RUID(k), gate.Address(), session, err)
 				}
 			default:
-				if err := server.Distribute(ruid.RUID(i), ruid.RUID(k), t, m, input.Bytes(), nil); err != nil {
+				if _, err := server.Distribute(ruid.RUID(i), ruid.RUID(k), t, m, input.Bytes()); err != nil {
 					log.Printf("[Gate@%v] Distribute %s(%v) to %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[m], m, server.symdict[t], ruid.RUID(i), ruid.RUID(k), gate.Address(), session, err)
 				}
 			}
@@ -112,7 +108,7 @@ func (s *GateImpl) handler(gate IGate) {
 	GateInst.mutex.Unlock()
 	if err := s.ignore(session, 0, session); err != nil {
 		log.Printf("[Gate@%v] Ignore session error %v:\n>>>> %v", server.Addr, session, err)
-	} else if err := server.Distribute(session, 0, SYMBOL_SESSION, SYMBOL_DESTROY, nil, nil); err != nil {
+	} else if _, err := server.Distribute(session, 0, SYMBOL_SESSION, SYMBOL_DESTROY, nil); err != nil {
 		log.Printf("[Gate@%v] Destroy session error %v:\n>>>> %v", server.Addr, session, err)
 	}
 }

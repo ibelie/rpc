@@ -84,7 +84,7 @@ type Server interface {
 	Address() string
 	Register(...*Node)
 	Notify(ruid.RUID, ruid.RUID, []byte) error
-	Distribute(ruid.RUID, ruid.RUID, uint64, uint64, []byte, chan<- []byte) error
+	Distribute(ruid.RUID, ruid.RUID, uint64, uint64, []byte) ([][]byte, error)
 	Procedure(ruid.RUID, ruid.RUID, uint64, uint64, []byte) ([]byte, error)
 	Request(string, ruid.RUID, uint64, []byte, ...uint64) ([][]byte, error)
 }
@@ -121,12 +121,13 @@ func (s *_Server) Notify(i ruid.RUID, k ruid.RUID, p []byte) (err error) {
 	return
 }
 
-func (s *_Server) Distribute(i ruid.RUID, k ruid.RUID, t uint64, m uint64, p []byte, r chan<- []byte) (err error) {
+func (s *_Server) Distribute(i ruid.RUID, k ruid.RUID, t uint64, m uint64, p []byte) (rs [][]byte, err error) {
 	var errors []string
 	services := make(map[string][]uint64)
 
 	if routes, ok := s.routes[t]; !ok {
-		return fmt.Errorf("[Distribute] Unknown entity type: %s(%v)", s.symdict[t], t)
+		err = fmt.Errorf("[Distribute] Unknown entity type: %s(%v)", s.symdict[t], t)
+		return
 	} else {
 		for c, ok := range routes {
 			if !ok {
@@ -145,26 +146,15 @@ func (s *_Server) Distribute(i ruid.RUID, k ruid.RUID, t uint64, m uint64, p []b
 			}
 		}
 	}
-	if r == nil {
-		for node, c := range services {
-			if _, e := s.Request(node, i, m, p, c...); e != nil {
-				errors = append(errors, fmt.Sprintf("\n>>>> Request error: %v %v\n>>>> %v", node, c, e))
-			}
+
+	for node, c := range services {
+		if ds, e := s.Request(node, i, m, p, c...); e != nil {
+			errors = append(errors, fmt.Sprintf("\n>>>> Request error: %v %v\n>>>> %v", node, c, e))
+		} else {
+			rs = append(rs, ds...)
 		}
-	} else if len(errors) == 0 {
-		go func() {
-			for node, c := range services {
-				if rs, e := s.Request(node, i, m, p, c...); e != nil {
-					log.Printf("[Server@%v] Distribute error: %v %v\n>>>> %v", s.Addr, node, c, e)
-				} else {
-					for _, d := range rs {
-						r <- d
-					}
-				}
-			}
-			close(r)
-		}()
 	}
+
 	if len(errors) > 0 {
 		err = fmt.Errorf("[Distribute] %s(%v:%v) %s(%v) errors:%s", s.symdict[t], i, k, s.symdict[m], m, strings.Join(errors, ""))
 	}

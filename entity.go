@@ -43,16 +43,18 @@ func NewEntity(i ruid.RUID, k ruid.RUID, t string) *Entity {
 	return &Entity{RUID: i, Key: k, Type: Symbols[t]}
 }
 
-func (e *Entity) Create() error {
+func (e *Entity) Create() (err error) {
 	data := make([]byte, tygo.SizeVarint(uint64(e.Key))+tygo.SizeVarint(e.Type))
 	output := &tygo.ProtoBuf{Buffer: data}
 	output.WriteVarint(uint64(e.Key))
 	output.WriteVarint(e.Type)
-	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_CREATE, data, nil)
+	_, err = Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_CREATE, data)
+	return
 }
 
-func (e *Entity) Destroy() error {
-	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_DESTROY, nil, nil)
+func (e *Entity) Destroy() (err error) {
+	_, err = Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_DESTROY, nil)
+	return
 }
 
 func (e *Entity) ByteSize() (size int) {
@@ -369,34 +371,37 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 	}
 
 	var result string
+	var result_declare string
 	if len(method.Results) == 1 {
 		result_s, result_p := method.Results[0].Go()
 		pkgs = update(pkgs, result_p)
-		params_declare = append(params_declare, fmt.Sprintf("rChan chan<- %s", result_s))
+		pkgs = update(pkgs, FMT_PKG)
+		result_declare = fmt.Sprintf("rs []%s, ", result_s)
 		result = fmt.Sprintf(`
-	if rChan != nil {
-		resultChan := make(chan []byte)
-		if err = Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_%s, %s, resultChan); err != nil {
-			return
-		}
-		for result := range resultChan {
-			var r %s
-			r, err = (*%sDelegate)(nil).Deserialize%sResult(result)
-			rChan <- r
-		}
-		close(rChan)
-		return
+	if results, er := Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_%s, %s); er != nil {
+		err = er
 	} else {
-		return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_%s, %s, nil)
-	}`, method.Name, param, result_s, service.Name, method.Name, method.Name, param)
+		var errors []string
+		for _, result := range results {
+			if r, er := (*%sDelegate)(nil).Deserialize%sResult(result); er != nil {
+				errors = append(errors, fmt.Sprintf("\n>>>> %%v", er))
+			} else {
+				rs = append(rs, r)
+			}
+		}
+		if len(errors) > 0 {
+			err = fmt.Errorf("[%s] %s errors:%%s", strings.Join(errors, ""))
+		}
+	}`, method.Name, param, service.Name, method.Name, service.Name, method.Name)
 	} else {
 		result = fmt.Sprintf(`
-	return Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_%s, %s, nil)`,
+	_, err = Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_%s, %s)`,
 			method.Name, param)
 	}
 
 	return fmt.Sprintf(`
-func (e *Entity) %s(%s) (err error) {%s
+func (e *Entity) %s(%s) (%serr error) {%s
+	return
 }
-`, method.Name, strings.Join(params_declare, ", "), result), pkgs
+`, method.Name, strings.Join(params_declare, ", "), result_declare, result), pkgs
 }
