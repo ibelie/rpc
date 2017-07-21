@@ -16,23 +16,12 @@ import (
 	"github.com/ibelie/tygo"
 )
 
-const (
-	SYMBOL_CREATE uint64 = iota
-	SYMBOL_DESTROY
-	SYMBOL_SYNCHRON
-)
-
 var (
 	RPC_PKG    = map[string]string{"github.com/ibelie/rpc": ""}
 	ENTITY_PKG = map[string]string{
 		"github.com/ibelie/rpc":  "",
 		"github.com/ibelie/ruid": "",
 		"github.com/ibelie/tygo": "",
-	}
-	builtinSymbols = []string{
-		"CREATE",
-		"DESTROY",
-		"SYNCHRON",
 	}
 )
 
@@ -204,7 +193,7 @@ func Symbols(dir string, entities []*Entity) {
 	}
 
 	var symbolConsts []string
-	for i, s := range builtinSymbols {
+	for i, s := range BUILTIN_SYMBOLS {
 		if maxSymbol < len(s) {
 			maxSymbol = len(s)
 		}
@@ -230,7 +219,7 @@ func Symbols(dir string, entities []*Entity) {
 	sort.Strings(symbolSorted)
 
 	var symbolValues []string
-	for _, s := range builtinSymbols {
+	for _, s := range BUILTIN_SYMBOLS {
 		symbolValues = append(symbolValues, fmt.Sprintf(`
 	"%s": %sSYMBOL_%s,`, s, strings.Repeat(" ", maxSymbol-len(s)), s))
 	}
@@ -331,7 +320,7 @@ func entityInitialize(services []*tygo.Object) (string, map[string]string) {
 	}
 
 	var symbolConst []string
-	for i, s := range builtinSymbols {
+	for i, s := range BUILTIN_SYMBOLS {
 		if i == 0 {
 			symbolConst = append(symbolConst, fmt.Sprintf(`
 	SYMBOL_%s uint64 = iota`, s))

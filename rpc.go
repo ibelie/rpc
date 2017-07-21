@@ -18,7 +18,6 @@ import (
 	"go/parser"
 	"go/token"
 
-	"github.com/ibelie/ruid"
 	"github.com/ibelie/tygo"
 )
 
@@ -26,18 +25,6 @@ var (
 	SRC_PATH = path.Join(os.Getenv("GOPATH"), "src")
 	PKG_PATH = reflect.TypeOf(Depend{}).PkgPath()
 )
-
-type Service interface {
-	Procedure(ruid.RUID, uint64, []byte) ([]byte, error)
-}
-
-type IServer interface {
-	Notify(ruid.RUID, ruid.RUID, []byte) error
-	Distribute(ruid.RUID, ruid.RUID, uint64, uint64, []byte, chan<- []byte) error
-	Procedure(ruid.RUID, ruid.RUID, uint64, uint64, []byte) ([]byte, error)
-}
-
-type Register func(IServer, map[string]uint64) (uint64, Service)
 
 type Depend struct {
 	Path     string
@@ -47,31 +34,6 @@ type Depend struct {
 type Entity struct {
 	Name       string
 	Components []*tygo.Object
-}
-
-func SerializeSession(i ruid.RUID, symbols map[string]uint64, components ...[]byte) (data []byte) {
-	symbolsSize := 0
-	for name, value := range symbols {
-		symbol := []byte(name)
-		symbolsSize += tygo.SizeVarint(uint64(len(symbol))) + len(symbol) + tygo.SizeVarint(value)
-	}
-	size := symbolsSize + tygo.SizeVarint(uint64(symbolsSize)) + tygo.SizeVarint(uint64(i))
-	for _, component := range components {
-		size += len(component)
-	}
-
-	data = make([]byte, size)
-	protobuf := &tygo.ProtoBuf{Buffer: data}
-	protobuf.WriteVarint(uint64(i))
-	protobuf.WriteVarint(uint64(symbolsSize))
-	for symbol, value := range symbols {
-		protobuf.WriteBuf([]byte(symbol))
-		protobuf.WriteVarint(value)
-	}
-	for _, component := range components {
-		protobuf.Write(component)
-	}
-	return
 }
 
 func Extract(dir string) (pkgname string, depends []*Depend) {
