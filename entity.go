@@ -376,6 +376,7 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 		result_s, result_p := method.Results[0].Go()
 		pkgs = update(pkgs, result_p)
 		pkgs = update(pkgs, FMT_PKG)
+		pkgs = update(pkgs, STR_PKG)
 		result_declare = fmt.Sprintf("rs []%s, ", result_s)
 		result = fmt.Sprintf(`
 	if results, er := Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_%s, %s); er != nil {

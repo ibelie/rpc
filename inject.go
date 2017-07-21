@@ -20,6 +20,7 @@ import (
 
 var (
 	FMT_PKG   = map[string]string{"fmt": ""}
+	STR_PKG   = map[string]string{"strings": ""}
 	LOCAL_PKG = map[string]string{
 		"fmt":                    "",
 		"sync":                   "",
