@@ -165,8 +165,9 @@ func injectServiceLocal(service *tygo.Object, object *doc.Type) (string, string,
 			service.onDestroy()`
 	}
 
-	pkgs := LOCAL_PKG
 	var cases []string
+	var pkgs map[string]string
+	pkgs = update(pkgs, LOCAL_PKG)
 	for _, m := range service.Methods {
 		if !hasMethod(object, m) {
 			continue

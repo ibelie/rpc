@@ -113,7 +113,7 @@ func update(a map[string]string, b map[string]string) map[string]string {
 	if b == nil {
 		return a
 	} else if a == nil {
-		return b
+		a = make(map[string]string)
 	}
 	for k, v := range b {
 		a[k] = v
