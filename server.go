@@ -237,7 +237,6 @@ request_end:
 }
 
 func (s *_Server) handler(conn Connection) {
-	defer conn.Close()
 	for {
 		if data, err := conn.Receive(); err != nil {
 			log.Printf("[Server@%v] Connection error:\n>>>> %v", s.Addr, err)
