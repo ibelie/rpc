@@ -200,6 +200,9 @@ func Symbols(dir string, entities []*Entity) {
 		if maxSymbol < len(s) {
 			maxSymbol = len(s)
 		}
+		if ok, exist := symbolMap[s]; exist && ok {
+			delete(symbolMap, s)
+		}
 		if i == 0 {
 			symbolConsts = append(symbolConsts, fmt.Sprintf(`
 	SYMBOL_%s uint64 = iota`, s))
