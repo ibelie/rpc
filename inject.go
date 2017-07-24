@@ -85,6 +85,9 @@ package %s
 		local_m, local_s, local_p := injectServiceLocal(service, objects[service.Name])
 		property_s, property_p := injectServiceProperty(service)
 		for _, method := range service.Methods {
+			if !hasMethod(objects[service.Name], method) {
+				continue
+			}
 			method_s, method_p := injectProcedureCaller(service.Name+DELEGATE, service.Name, method, local_m)
 			pkgs = update(pkgs, method_p)
 			methods = append(methods, method_s)

@@ -45,10 +45,15 @@ Entity.prototype.%s = function(%s) {
 		console.warn('[Entity] Not awake:', this);
 		return;
 	}
+	for (var k in this) {
+		var v = this[k];
+		v.%s && v.%s.call(v, %s);
+	}
 	var data = ibelie.rpc.%s.Serialize%s(%s);
 	this.connection.send(this, ibelie.rpc.Symbols.%s, data);
 };
 `, m.Name, c.Name, m.Name, m.Name, strings.Join(params, ", "),
+					m.Name, m.Name, strings.Join(params, ", "),
 					c.Name, m.Name, strings.Join(params, ", "), m.Name))
 				requireMap[fmt.Sprintf(`
 goog.require('ibelie.rpc.%s');`, c.Name)] = true

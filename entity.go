@@ -260,8 +260,13 @@ func Routes(dir string, entities []*Entity) {
 			}
 			components = append(components, fmt.Sprintf(`
 		SYMBOL_%s: true,`, c.Name))
-			for _, m := range c.Protocol.Methods {
-				methodMap[m.Name] = append(methodMap[m.Name], c.Name)
+			for _, m := range c.Service.Methods {
+				for _, p := range c.Protocol.Methods {
+					if p.Name == m.Name {
+						methodMap[m.Name] = append(methodMap[m.Name], c.Name)
+						break
+					}
+				}
 			}
 		}
 		routes = append(routes, fmt.Sprintf(`
