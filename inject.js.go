@@ -38,7 +38,7 @@ func injectJavascript(dir string, entities []*Entity) {
 				localParams := append([]string{"v"}, params...)
 				methods = append(methods, fmt.Sprintf(`
 Entity.prototype.Deserialize%s = function(data) {
-	return ibelie.rpc.%s.Deserialize%s(data);
+	return ibelie.rpc.%s.Deserialize%sParam(data);
 };
 
 Entity.prototype.%s = function(%s) {
