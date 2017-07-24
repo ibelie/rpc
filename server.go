@@ -123,27 +123,38 @@ func (s *_Server) Notify(i ruid.RUID, k ruid.RUID, p []byte) (err error) {
 
 func (s *_Server) Distribute(i ruid.RUID, k ruid.RUID, t uint64, m uint64, p []byte) (rs [][]byte, err error) {
 	var errors []string
-	services := make(map[string][]uint64)
+	var components []uint64
 
 	if routes, ok := s.routes[t]; !ok {
 		err = fmt.Errorf("[Distribute] Unknown entity type: %s(%v)", s.symdict[t], t)
 		return
+	} else if cs, exist := s.routes[m]; !exist {
+		for c, ok := range routes {
+			if ok {
+				components = append(components, c)
+			}
+		}
 	} else {
 		for c, ok := range routes {
 			if !ok {
 				continue
-			} else if cs, exist := s.routes[m]; exist {
-				if ok, exist := cs[c]; !ok || !exist {
-					continue
-				}
+			} else if ok, exist := cs[c]; ok && exist {
+				components = append(components, c)
 			}
-			if ring, ok := s.remote[c]; !ok {
-				errors = append(errors, fmt.Sprintf("\n>>>> Unknown service type: %s(%v)", s.symdict[c], c))
-			} else if node, ok := ring.Get(k); !ok {
-				errors = append(errors, fmt.Sprintf("\n>>>> No service found: %s(%v) %v %v", s.symdict[c], c, s.Node, s.nodes))
-			} else {
-				services[node] = append(services[node], c)
-			}
+		}
+		if ok, exist := cs[t]; ok && exist {
+			components = append(components, SYMBOL_HUB)
+		}
+	}
+
+	services := make(map[string][]uint64)
+	for _, c := range components {
+		if ring, ok := s.remote[c]; !ok {
+			errors = append(errors, fmt.Sprintf("\n>>>> Unknown service type: %s(%v)", s.symdict[c], c))
+		} else if node, ok := ring.Get(k); !ok {
+			errors = append(errors, fmt.Sprintf("\n>>>> No service found: %s(%v) %v %v", s.symdict[c], c, s.Node, s.nodes))
+		} else {
+			services[node] = append(services[node], c)
 		}
 	}
 

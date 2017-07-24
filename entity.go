@@ -252,32 +252,56 @@ var Symbols = map[string]uint64{%s
 func Routes(dir string, entities []*Entity) {
 	var routes []string
 	methodMap := make(map[string][]string)
+	componentMap := make(map[string]*Component)
 	for _, e := range entities {
 		var components []string
+		cMethods := make(map[string]bool)
+		pMethods := make(map[string]bool)
 		for _, c := range e.Components {
 			if c.Protocol == nil {
 				continue
 			}
+			for _, m := range c.Protocol.Methods {
+				pMethods[m.Name] = true
+			}
+			for _, m := range c.Methods {
+				cMethods[m] = true
+			}
 			components = append(components, fmt.Sprintf(`
 		SYMBOL_%s: true,`, c.Name))
-			for _, m := range c.Service.Methods {
-				for _, p := range c.Protocol.Methods {
-					if p.Name == m.Name {
-						methodMap[m.Name] = append(methodMap[m.Name], c.Name)
-						break
-					}
+			componentMap[c.Name] = c
+		}
+
+		for m, ok := range pMethods {
+			if ok {
+				if ok, exist := cMethods[m]; ok && exist {
+					methodMap[m] = append(methodMap[m], e.Name)
 				}
 			}
 		}
+
 		routes = append(routes, fmt.Sprintf(`
 	SYMBOL_%s: map[uint64]bool{%s
 	},`, e.Name, strings.Join(components, "")))
 	}
 
+	for _, c := range componentMap {
+		for _, p := range c.Protocol.Methods {
+			for _, m := range c.Service.Methods {
+				if p.Name == m.Name {
+					methodMap[p.Name] = append(methodMap[p.Name], c.Name)
+					break
+				}
+			}
+		}
+	}
+
 	var methodSorted []string
-	for m, _ := range methodMap {
-		methodSorted = append(methodSorted, m)
-		sort.Strings(methodMap[m])
+	for m, r := range methodMap {
+		if len(r) > 0 {
+			methodSorted = append(methodSorted, m)
+		}
+		sort.Strings(r)
 	}
 	sort.Strings(methodSorted)
 	for _, m := range methodSorted {
