@@ -50,7 +50,7 @@ Entity.prototype.%s = function(%s) {
 		var v = this[k];
 		v.%s && v.%s.call(%s);
 	}
-	var data = ibelie.rpc.%s.Serialize%s(%s);
+	var data = ibelie.rpc.%s.Serialize%sParam(%s);
 	this.connection.send(this, ibelie.rpc.Symbols.%s, data);
 };
 `, m.Name, c.Name, m.Name, m.Name, strings.Join(params, ", "),
