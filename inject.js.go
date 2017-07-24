@@ -147,8 +147,9 @@ ibelie.rpc.Component.prototype.Drop = function(e) {
 		}
 	}
 	e.isAwake = false;
+	var conn = this.Entity.connection;
 	conn.send(e, ibelie.rpc.Symbols.IGNORE);
-	delete this.Entity.connection.entities[e.RUID];
+	delete conn.entities[e.RUID];
 	var entity = new Entity();
 	entity.RUID	= e.RUID;
 	entity.Key	= e.Key;
@@ -252,8 +253,10 @@ ibelie.rpc.Connection.prototype.send = function(entity, method, data) {
 	protobuf.WriteVarint(entity.Key);
 	protobuf.WriteVarint(entity.Type);
 	protobuf.WriteVarint(method);
-	protobuf.WriteBytes(data);
-	conn.socket.send(protobuf.Base64());
+	if (data) {
+		protobuf.WriteBytes(data);
+	}
+	this.socket.send(protobuf.Base64());
 };
 
 ibelie.rpc.Connection.prototype.disconnect = function() {
