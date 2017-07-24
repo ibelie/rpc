@@ -185,14 +185,14 @@ func Symbols(dir string, entities []*Entity) {
 	for _, e := range entities {
 		symbolMap[e.Name] = true
 		for _, c := range e.Components {
-			if c.Service == nil {
+			if c.Protocol == nil {
 				continue
 			}
 			symbolMap[c.Name] = true
-			for _, f := range c.Service.Fields {
+			for _, f := range c.Protocol.Fields {
 				symbolMap[f.Name] = true
 			}
-			for _, m := range c.Service.Methods {
+			for _, m := range c.Protocol.Methods {
 				symbolMap[m.Name] = true
 			}
 		}
@@ -257,12 +257,12 @@ func Routes(dir string, entities []*Entity) {
 	for _, e := range entities {
 		var components []string
 		for _, c := range e.Components {
-			if c.Service == nil {
+			if c.Protocol == nil {
 				continue
 			}
 			components = append(components, fmt.Sprintf(`
 		SYMBOL_%s: true,`, c.Name))
-			for _, m := range c.Service.Methods {
+			for _, m := range c.Protocol.Methods {
 				methodMap[m.Name] = append(methodMap[m.Name], c.Name)
 			}
 		}

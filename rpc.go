@@ -33,10 +33,11 @@ type Depend struct {
 }
 
 type Component struct {
-	Name    string
-	Path    string
-	Methods []string
-	Service *tygo.Object
+	Name     string
+	Path     string
+	Methods  []string
+	Protocol *tygo.Object
+	Service  *doc.Type
 }
 
 type Entity struct {
@@ -212,26 +213,46 @@ func resolveTypes(typesMap map[string]tygo.Type, typ tygo.Type) {
 
 func resolveEntities(entities []*Entity) (types []tygo.Type) {
 	pkgMap := make(map[string][]tygo.Type)
+	docMap := make(map[string]map[string]*doc.Type)
 	typesMap := make(map[string]tygo.Type)
 	for _, e := range entities {
 		for _, c := range e.Components {
 			ts, ok := pkgMap[c.Path]
 			if !ok {
-				if _, err := build.Import(c.Path, "", build.ImportComment); err != nil {
+				if p, err := build.Import(c.Path, "", build.ImportComment); err != nil {
 					if strings.Contains(err.Error(), fmt.Sprintf("cannot find package %q in any of:\n", c.Path)) {
 						log.Printf("[RPC][Entity] Ignore client component %q from %q", c.Name, c.Path)
 					} else {
 						log.Fatalf("[RPC][Entity] Import component %q from %q:\n>>>> %v", c.Name, c.Path, err)
 					}
 					continue
+				} else {
+					include := func(info os.FileInfo) bool {
+						for _, name := range p.GoFiles {
+							if name == info.Name() {
+								return true
+							}
+						}
+						return false
+					}
+
+					if pkgs, err := parser.ParseDir(token.NewFileSet(), p.Dir, include, parser.ParseComments); err == nil && len(pkgs) == 1 {
+						docTypes := make(map[string]*doc.Type)
+						for _, t := range doc.New(pkgs[p.Name], p.ImportPath, doc.AllDecls).Types {
+							docTypes[t.Name] = t
+						}
+						docMap[c.Path] = docTypes
+					}
+					ts = tygo.Extract(c.Path, ReplaceEntity)
+					pkgMap[c.Path] = ts
 				}
-				ts = tygo.Extract(c.Path, ReplaceEntity)
 			}
+			c.Service = docMap[c.Path][c.Name]
 			for _, typ := range ts {
 				switch t := typ.(type) {
 				case *tygo.Object:
 					if t.Name == c.Name {
-						c.Service = t
+						c.Protocol = t
 					}
 					typesMap[t.Name] = t
 				case *tygo.Enum:

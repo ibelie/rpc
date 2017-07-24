@@ -22,10 +22,10 @@ func injectJavascript(dir string, entities []*Entity) {
 	var methods []string
 	for _, e := range entities {
 		for _, c := range e.Components {
-			if c.Service == nil {
+			if c.Protocol == nil {
 				continue
 			}
-			for _, m := range c.Service.Methods {
+			for _, m := range c.Protocol.Methods {
 				if ok, exist := methodsMap[m.Name]; exist && ok {
 					continue
 				} else if len(m.Results) > 0 {
