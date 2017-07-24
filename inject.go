@@ -64,6 +64,7 @@ func Inject(dir string, filename string, pkgname string, types []tygo.Type, _ []
 			for _, s := range services {
 				if t.Name == s.Name {
 					objects[t.Name] = t
+					break
 				}
 			}
 		}

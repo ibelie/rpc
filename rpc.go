@@ -58,6 +58,7 @@ func Extract(dir string) (pkgname string, depends []*Depend) {
 			log.Fatalf("[RPC][Entity] Cannot parse file:\n>>>> %v", err)
 		}
 		pkgname = file.Name.Name
+	file_loop:
 		for _, d := range file.Decls {
 			decl, ok := d.(*ast.GenDecl)
 			if !ok || decl.Tok != token.IMPORT {
@@ -71,6 +72,7 @@ func Extract(dir string) (pkgname string, depends []*Depend) {
 				if strings.TrimSpace(decl.Doc.Text()) != "" {
 					depends = merge(depends, parse(decl.Doc.Text())...)
 				}
+				break file_loop
 			}
 		}
 	}
@@ -212,6 +214,7 @@ func resolveTypes(typesMap map[string]tygo.Type, typ tygo.Type) {
 }
 
 func resolveEntities(entities []*Entity) (types []tygo.Type) {
+	fs := token.NewFileSet()
 	pkgMap := make(map[string][]tygo.Type)
 	docMap := make(map[string]map[string]*doc.Type)
 	typesMap := make(map[string]tygo.Type)
@@ -235,8 +238,7 @@ func resolveEntities(entities []*Entity) (types []tygo.Type) {
 						}
 						return false
 					}
-
-					if pkgs, err := parser.ParseDir(token.NewFileSet(), p.Dir, include, parser.ParseComments); err == nil && len(pkgs) == 1 {
+					if pkgs, err := parser.ParseDir(fs, p.Dir, include, parser.ParseComments); err == nil && len(pkgs) == 1 {
 						docTypes := make(map[string]*doc.Type)
 						for _, t := range doc.New(pkgs[p.Name], p.ImportPath, doc.AllDecls).Types {
 							docTypes[t.Name] = t

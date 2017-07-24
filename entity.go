@@ -113,34 +113,32 @@ package %s
 	for _, depend := range depends {
 		for _, t := range tygo.Extract(depend.Path, nil) {
 			for _, s := range depend.Services {
-				if object, ok := isService(t); ok {
-					if s == object.Name {
-						var methods []string
-						services = append(services, object)
-						for _, method := range object.Methods {
-							if len(method.Params) > 0 {
-								param_s, param_p := tygo.TypeListSerialize(object.Name+DELEGATE, method.Name, "param", method.Params)
-								pkgs = update(pkgs, param_p)
-								methods = append(methods, param_s)
-							}
-							if len(method.Results) > 0 {
-								result_s, result_p := tygo.TypeListDeserialize(object.Name+DELEGATE, method.Name, "result", method.Results)
-								pkgs = update(pkgs, result_p)
-								methods = append(methods, result_s)
-							}
-							method_s, method_p := injectProcedureCaller(object.Name+DELEGATE, object.Name, method, "")
-							pkgs = update(pkgs, method_p)
-							methods = append(methods, method_s)
+				if object, ok := isService(t); ok && s == object.Name {
+					var methods []string
+					services = append(services, object)
+					for _, method := range object.Methods {
+						if len(method.Params) > 0 {
+							param_s, param_p := tygo.TypeListSerialize(object.Name+DELEGATE, method.Name, "param", method.Params)
+							pkgs = update(pkgs, param_p)
+							methods = append(methods, param_s)
 						}
+						if len(method.Results) > 0 {
+							result_s, result_p := tygo.TypeListDeserialize(object.Name+DELEGATE, method.Name, "result", method.Results)
+							pkgs = update(pkgs, result_p)
+							methods = append(methods, result_s)
+						}
+						method_s, method_p := injectProcedureCaller(object.Name+DELEGATE, object.Name, method, "")
+						pkgs = update(pkgs, method_p)
+						methods = append(methods, method_s)
+					}
 
-						body.Write([]byte(fmt.Sprintf(`
+					body.Write([]byte(fmt.Sprintf(`
 type %sDelegate Entity
 
 func (e *Entity) %s() *%sDelegate {
 	return (*%sDelegate)(e)
 }
 %s`, object.Name, object.Name, object.Name, object.Name, strings.Join(methods, ""))))
-					}
 				}
 			}
 		}
