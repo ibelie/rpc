@@ -100,6 +100,7 @@ Entity.prototype.Serialize = function() {
 };
 
 Entity.prototype.Deserialize = function(data) {
+	var protobuf = new tyts.ProtoBuf(data);
 	this.RUID = protobuf.ReadVarint();
 	this.Key  = protobuf.ReadVarint();
 	this.Type = protobuf.ReadVarint();
