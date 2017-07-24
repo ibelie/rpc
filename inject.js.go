@@ -35,6 +35,7 @@ func injectJavascript(dir string, entities []*Entity) {
 				for i, _ := range m.Params {
 					params = append(params, fmt.Sprintf("a%d", i))
 				}
+				localParams := append([]string{"v"}, params...)
 				methods = append(methods, fmt.Sprintf(`
 Entity.prototype.Deserialize%s = function(data) {
 	return ibelie.rpc.%s.Deserialize%s(data);
@@ -47,13 +48,13 @@ Entity.prototype.%s = function(%s) {
 	}
 	for (var k in this) {
 		var v = this[k];
-		v.%s && v.%s.call(v, %s);
+		v.%s && v.%s.call(%s);
 	}
 	var data = ibelie.rpc.%s.Serialize%s(%s);
 	this.connection.send(this, ibelie.rpc.Symbols.%s, data);
 };
 `, m.Name, c.Name, m.Name, m.Name, strings.Join(params, ", "),
-					m.Name, m.Name, strings.Join(params, ", "),
+					m.Name, m.Name, strings.Join(localParams, ", "),
 					c.Name, m.Name, strings.Join(params, ", "), m.Name))
 				requireMap[fmt.Sprintf(`
 goog.require('ibelie.rpc.%s');`, c.Name)] = true
@@ -167,7 +168,7 @@ ibelie.rpc.Connection = function(url) {
 				ibelie.rpc.Dictionary = {};
 				var buffer = new tyts.ProtoBuf(protobuf.ReadBuffer());
 				while (!buffer.End()) {
-					var symbol = tyts.String.Deserialize(nil, buffer);
+					var symbol = tyts.String.Deserialize(null, buffer);
 					var value = buffer.ReadVarint();
 					ibelie.rpc.Symbols[symbol] = value;
 					ibelie.rpc.Dictionary[value] = symbol;
@@ -242,7 +243,7 @@ ibelie.rpc.Connection = function(url) {
 
 ibelie.rpc.Connection.prototype.send = function(entity, method, data) {
 	var size = tyts.SizeVarint(entity.RUID) + tyts.SizeVarint(entity.Key) + tyts.SizeVarint(entity.Type) + tyts.SizeVarint(method);
-	if data {
+	if (data) {
 		size += data.length;
 	}
 	var protobuf = new tyts.ProtoBuf(new Uint8Array(size));
