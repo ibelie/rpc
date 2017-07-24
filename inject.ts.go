@@ -14,6 +14,7 @@ import (
 
 	"io/ioutil"
 
+	"github.com/ibelie/rpc/typescript"
 	"github.com/ibelie/tygo"
 )
 
@@ -38,6 +39,7 @@ func Typescript(input string, tsOut string) []*Entity {
 			entityMap[e[1]][pkg] = append(entityMap[e[1]][pkg], c[1])
 		}
 	}
+	typescript.Extract(input)
 
 	entities, types := resolveEntities(entityMap)
 	objects := make(map[string]*tygo.Object)

@@ -7,24 +7,65 @@ package typescript
 import (
 	"log"
 	"os"
-	"os/exec"
 	"path"
 	"reflect"
 
-	"github.com/ibelie/rpc"
+	"encoding/json"
+	"os/exec"
 )
 
-type X struct{}
+var JS_PATH = path.Join(os.Getenv("GOPATH"), "src", reflect.TypeOf(PackageStr{}).PkgPath(), "extract.js")
 
-var JS_PATH = path.Join(os.Getenv("GOPATH"), "src", reflect.TypeOf(X{}).PkgPath(), "extract.js")
+type TypeStr struct {
+	Simple string
+	List   *TypeStr
+	Key    *TypeStr
+	Value  *TypeStr
+}
 
-func Extract(file string) (entities []*rpc.Entity) {
-	log.Println(JS_PATH)
-	cmd := exec.Command("node", JS_PATH, file)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		log.Panicf("[Protobuf] Cannot build proto:\n%v", string(output))
-	} else {
-		log.Println(string(output))
+type FieldStr struct {
+	Name     string
+	Document string
+	Type     *TypeStr
+}
+
+type MethodStr struct {
+	Name     string
+	Document string
+	Result   *TypeStr
+	Params   []*TypeStr
+}
+
+type ObjectStr struct {
+	Name    string
+	Parents []*TypeStr
+	Fields  []*FieldStr
+	Methods []*MethodStr
+}
+
+type PackageStr struct {
+	Files   []string
+	Objects []*ObjectStr
+}
+
+func Extract(file string) (pkg *PackageStr) {
+	output, err := exec.Command("node", JS_PATH, file).CombinedOutput()
+	if err != nil {
+		log.Fatalf("[Typescript] Cannot extract: %s\n>>>> %v", string(output))
+	} else if err = json.Unmarshal(output, &pkg); err != nil {
+		log.Fatalf("[Typescript] Cannot unmarshal objects:\n>>>> %v", err)
+	}
+	for _, objectStr := range pkg.Objects {
+		log.Println("Object:", objectStr.Name)
+		for _, parentStr := range objectStr.Parents {
+			log.Println("\tParent:", parentStr.Simple)
+		}
+		for _, fieldStr := range objectStr.Fields {
+			log.Println("\tField:", fieldStr.Name, fieldStr.Document, fieldStr.Type.Simple)
+		}
+		for _, methodStr := range objectStr.Methods {
+			log.Println("\tMethod:", methodStr.Name, methodStr.Document, methodStr.Params, methodStr.Result)
+		}
 	}
 	return
 }
