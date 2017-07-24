@@ -42,7 +42,9 @@ function Extract(fileNames, options) {
 		};
 		if (node.heritageClauses) {
 			for (var _i = 0, _a = node.heritageClauses; _i < _a.length; _i++) {
-				object.Parents.push({ Simple: _a[_i].getLastToken().getText() });
+				for (var _j = 0, _b = _a[_i].types; _j < _b.length; _j++) {
+					object.Parents.push({ Simple: _b[_j].getText() });
+				}
 			}
 		}
 		for (var m in symbol.members) {
@@ -51,7 +53,7 @@ function Extract(fileNames, options) {
 			if (t.getCallSignatures() && t.getCallSignatures().length > 0) {
 				var method = {
 					Name: m,
-					Params: t.getCallSignatures()[0].parameters.map(function (x) { return type(checker.getTypeOfSymbolAtLocation(x, x.valueDeclaration)); }),
+					Params: t.getCallSignatures()[0].parameters.map(function (x) { return type(checker.getTypeOfSymbolAtLocation(x, x.valueDeclaration), x.valueDeclaration); }),
 					Document: ts.displayPartsToString(s.getDocumentationComment())
 				};
 				var result = type(t.getCallSignatures()[0].getReturnType());
@@ -63,7 +65,7 @@ function Extract(fileNames, options) {
 			else {
 				object.Fields.push({
 					Name: m,
-					Type: type(t),
+					Type: type(t, s.valueDeclaration),
 					Document: ts.displayPartsToString(s.getDocumentationComment())
 				});
 			}
@@ -75,9 +77,9 @@ function Extract(fileNames, options) {
 		return (node.flags & ts.NodeFlags.Export) !== 0 || (node.parent && node.parent.kind === ts.SyntaxKind.SourceFile);
 	}
 
-	function type(t) {
+	function type(t, d) {
 		if (t.flags & ts.TypeFlags.StringLike) {
-			return { Simple: checker.typeToString(t) };
+			return { Simple: checker.typeToString(t, d) };
 		}
 		else if (checker.typeToString(t).substr(checker.typeToString(t).length - 2) == "[]") {
 			return { List: type(checker.getIndexTypeOfType(t, ts.IndexKind.Number)) };
@@ -89,7 +91,7 @@ function Extract(fileNames, options) {
 			return { Key: { Simple: "string" }, Value: type(checker.getIndexTypeOfType(t, ts.IndexKind.String)) };
 		}
 		else {
-			return { Simple: checker.typeToString(t) };
+			return { Simple: checker.typeToString(t, d) };
 		}
 	}
 }
