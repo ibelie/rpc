@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log"
 	"path"
-	"regexp"
 	"strings"
 
 	"io/ioutil"
@@ -18,30 +17,36 @@ import (
 	"github.com/ibelie/tygo"
 )
 
-func Typescript(input string, tsOut string) []*Entity {
-	text, err := ioutil.ReadFile(input)
-	if err != nil {
-		log.Fatalf("[RPC][Typescript] Cannot read file:\n>>>> %v", err)
-		return nil
-	}
-
-	componentReg := regexp.MustCompile(`([_\d\w]+)\s*:\s*([\._\d\w]+)\s*;`)
-	entityReg := regexp.MustCompile(`class\s+([_\d\w]+)\s+extends\s+ibelie.rpc.Entity\s*{`)
-	entityText := entityReg.Split(string(text), -1)
-	entityMap := make(map[string]map[string][]string)
-	for i, e := range entityReg.FindAllStringSubmatch(string(text), -1) {
-		entityMap[e[1]] = make(map[string][]string)
-		for _, c := range componentReg.FindAllStringSubmatch(entityText[i+1], -1) {
-			if !strings.HasSuffix(c[2], c[1]) {
-				continue
-			}
-			pkg := strings.Replace(c[2][:len(c[2])-len(c[1])-1], ".", "/", -1)
-			entityMap[e[1]][pkg] = append(entityMap[e[1]][pkg], c[1])
+func Typescript(input string, tsOut string) (entities []*Entity) {
+	pkg := typescript.Extract(input)
+	components := make(map[string]*Component)
+	for _, o := range pkg.Objects {
+		if len(o.Parents) != 1 || o.Parents[0] == nil || o.Parents[0].Simple != "ibelie.rpc.Component" {
+			continue
 		}
+		component := &Component{Name: o.Name}
+		for _, m := range o.Methods {
+			component.Methods = append(component.Methods, m.Name)
+		}
+		components[component.Name] = component
 	}
-	typescript.Extract(input)
+	for _, o := range pkg.Objects {
+		if len(o.Parents) != 1 || o.Parents[0] == nil || o.Parents[0].Simple != "ibelie.rpc.Entity" {
+			continue
+		}
+		entity := &Entity{Name: o.Name}
+		for _, f := range o.Fields {
+			if f.Type == nil || !strings.HasSuffix(f.Type.Simple, "."+f.Name) {
+				continue
+			} else if component, ok := components[f.Name]; ok {
+				component.Path = strings.Replace(f.Type.Simple[:len(f.Type.Simple)-len(f.Name)-1], ".", "/", -1)
+				entity.Components = append(entity.Components, component)
+			}
+		}
+		entities = append(entities, entity)
+	}
 
-	entities, types := resolveEntities(entityMap)
+	types := resolveEntities(entities)
 	objects := make(map[string]*tygo.Object)
 	for _, t := range types {
 		if object, ok := t.(*tygo.Object); ok {
@@ -65,7 +70,10 @@ func injectTypescript(dir string, entities []*Entity, objects map[string]*tygo.O
 	tygo.TS_OBJECTS = objects
 	for _, e := range entities {
 		for _, c := range e.Components {
-			for _, m := range c.Methods {
+			if c.Service == nil {
+				continue
+			}
+			for _, m := range c.Service.Methods {
 				if ok, exist := methodsMap[m.Name]; exist && ok {
 					continue
 				} else if len(m.Results) > 0 {

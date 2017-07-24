@@ -5,6 +5,7 @@
 package rpc
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path"
@@ -31,9 +32,16 @@ type Depend struct {
 	Services []string
 }
 
+type Component struct {
+	Name    string
+	Path    string
+	Methods []string
+	Service *tygo.Object
+}
+
 type Entity struct {
 	Name       string
-	Components []*tygo.Object
+	Components []*Component
 }
 
 func Extract(dir string) (pkgname string, depends []*Depend) {
@@ -202,30 +210,28 @@ func resolveTypes(typesMap map[string]tygo.Type, typ tygo.Type) {
 	}
 }
 
-func resolveEntities(entityMap map[string]map[string][]string) (entities []*Entity, types []tygo.Type) {
+func resolveEntities(entities []*Entity) (types []tygo.Type) {
+	pkgMap := make(map[string][]tygo.Type)
 	typesMap := make(map[string]tygo.Type)
-	var entitySorted []string
-	for n, _ := range entityMap {
-		entitySorted = append(entitySorted, n)
-	}
-	sort.Strings(entitySorted)
-
-	for _, n := range entitySorted {
-		var componentSorted []string
-		componentMap := make(map[string]*tygo.Object)
-		for pkg, names := range entityMap[n] {
-			if _, err := build.Import(pkg, "", build.ImportComment); err != nil {
-				log.Printf("[RPC][Entity] Ignore component:\n>>>> %v", err)
-				continue
+	for _, e := range entities {
+		for _, c := range e.Components {
+			ts, ok := pkgMap[c.Path]
+			if !ok {
+				if _, err := build.Import(c.Path, "", build.ImportComment); err != nil {
+					if strings.Contains(err.Error(), fmt.Sprintf("cannot find package %q in any of:\n", c.Path)) {
+						log.Printf("[RPC][Entity] Ignore client component %q from %q", c.Name, c.Path)
+					} else {
+						log.Fatalf("[RPC][Entity] Import component %q from %q:\n>>>> %v", c.Name, c.Path, err)
+					}
+					continue
+				}
+				ts = tygo.Extract(c.Path, ReplaceEntity)
 			}
-			for _, typ := range tygo.Extract(pkg, ReplaceEntity) {
+			for _, typ := range ts {
 				switch t := typ.(type) {
 				case *tygo.Object:
-					for _, s := range names {
-						if t.Parent.Name == "Entity" && s == t.Name {
-							componentSorted = append(componentSorted, s)
-							componentMap[s] = t
-						}
+					if t.Name == c.Name {
+						c.Service = t
 					}
 					typesMap[t.Name] = t
 				case *tygo.Enum:
@@ -233,12 +239,6 @@ func resolveEntities(entityMap map[string]map[string][]string) (entities []*Enti
 				}
 			}
 		}
-		sort.Strings(componentSorted)
-		var components []*tygo.Object
-		for _, c := range componentSorted {
-			components = append(components, componentMap[c])
-		}
-		entities = append(entities, &Entity{Name: n, Components: components})
 	}
 
 	var typesSorted []string

@@ -55,17 +55,5 @@ func Extract(file string) (pkg *PackageStr) {
 	} else if err = json.Unmarshal(output, &pkg); err != nil {
 		log.Fatalf("[Typescript] Cannot unmarshal objects:\n>>>> %v", err)
 	}
-	for _, objectStr := range pkg.Objects {
-		log.Println("Object:", objectStr.Name)
-		for _, parentStr := range objectStr.Parents {
-			log.Println("\tParent:", parentStr.Simple)
-		}
-		for _, fieldStr := range objectStr.Fields {
-			log.Println("\tField:", fieldStr.Name, fieldStr.Document, fieldStr.Type.Simple)
-		}
-		for _, methodStr := range objectStr.Methods {
-			log.Println("\tMethod:", methodStr.Name, methodStr.Document, methodStr.Params, methodStr.Result)
-		}
-	}
 	return
 }

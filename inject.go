@@ -109,7 +109,7 @@ func (e *Entity) %s() *%sDelegate {
 	sort.Strings(sortedPkg)
 	for _, pkg := range sortedPkg {
 		head.Write([]byte(fmt.Sprintf(`
-import %s"%s"`, pkgs[pkg], pkg)))
+import %s%q`, pkgs[pkg], pkg)))
 	}
 
 	head.Write(body.Bytes())
@@ -143,7 +143,7 @@ func injectProcedureCallee(service *tygo.Object, method *tygo.Method) (string, m
 
 	return fmt.Sprintf(`
 	case SYMBOL_%s:
-		methodName = "%s"
+		methodName = %q
 		if service, exist := s.services[i]; !exist {
 			err = fmt.Errorf("[%s] Service %s RUID not exists: %%v", i)
 		}%s%s
