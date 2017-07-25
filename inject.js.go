@@ -21,7 +21,7 @@ const (
 	JS_RUID = iota
 	JS_UUID
 	JS_STRID
-	ID_TYPE = JS_STRID
+	ID_TYPE = JS_RUID
 )
 
 var ID_ZERO = []string{

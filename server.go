@@ -12,7 +12,7 @@ import (
 
 	"github.com/ibelie/tygo"
 
-	id "github.com/ibelie/rpc/strid"
+	id "github.com/ibelie/ruid"
 )
 
 const (

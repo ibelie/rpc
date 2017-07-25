@@ -24,9 +24,9 @@ var (
 	LOCAL_PKG = map[string]string{
 		"fmt":  "",
 		"sync": "",
-		"github.com/ibelie/rpc/strid": "id ",
-		"github.com/ibelie/rpc":       "",
-		"github.com/ibelie/tygo":      "",
+		"github.com/ibelie/ruid": "id ",
+		"github.com/ibelie/rpc":  "",
+		"github.com/ibelie/tygo": "",
 	}
 	PROP_PRE = []tygo.Type{tygo.SimpleType_UINT64, tygo.SimpleType_UINT64}
 	DELEGATE = "Delegate"
