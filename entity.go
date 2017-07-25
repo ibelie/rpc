@@ -47,14 +47,14 @@ func (e *Entity) Create() (err error) {
 	t := e.Type << 1
 	size := tygo.SizeVarint(t)
 	if e.Key != 0 {
-		size += 8
+		size += e.Key.ByteSize()
 		t |= 1
 	}
 	data := make([]byte, size)
 	output := &tygo.ProtoBuf{Buffer: data}
 	output.WriteVarint(t)
 	if e.Key != 0 {
-		output.WriteFixed64(uint64(e.Key))
+		e.Key.Serialize(output)
 	}
 	_, err = Server.Distribute(e.ID, e.Key, e.Type, SYMBOL_CREATE, data)
 	return
@@ -69,10 +69,10 @@ func (e *Entity) ByteSize() (size int) {
 	if e != nil {
 		size = tygo.SizeVarint(e.Type << 2)
 		if e.ID != 0 {
-			size += 8
+			size += e.ID.ByteSize()
 		}
 		if e.Key != 0 {
-			size += 8
+			size += e.Key.ByteSize()
 		}
 		e.SetCachedSize(size)
 	}
@@ -90,29 +90,27 @@ func (e *Entity) Serialize(output *tygo.ProtoBuf) {
 		}
 		output.WriteVarint(t)
 		if e.ID != 0 {
-			output.WriteFixed64(uint64(e.ID))
+			e.ID.Serialize(output)
 		}
 		if e.Key != 0 {
-			output.WriteFixed64(uint64(e.Key))
+			e.Key.Serialize(output)
 		}
 	}
 }
 
 func (e *Entity) Deserialize(input *tygo.ProtoBuf) (err error) {
-	var t, i, k uint64
+	var t uint64
 	if t, err = input.ReadVarint(); err != nil {
 		return
 	}
 	if t&1 == 0 {
-	} else if i, err = input.ReadFixed64(); err != nil {
+	} else if err = e.ID.Deserialize(input); err != nil {
 		return
 	}
 	if t&2 == 0 {
-	} else if k, err = input.ReadFixed64(); err != nil {
+	} else if err = e.Key.Deserialize(input); err != nil {
 		return
 	}
-	e.ID = id.ID(i)
-	e.Key = id.ID(k)
 	e.Type = t >> 2
 	return
 }

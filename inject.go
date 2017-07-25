@@ -211,14 +211,15 @@ func (s *%sServiceImpl) Procedure(i id.ID, method uint64, param []byte) (result 
 			err = fmt.Errorf("[%s] Service create ID already exists: %%v", i)
 		} else {
 			input := &tygo.ProtoBuf{Buffer: param}
-			var t, k uint64
+			var k id.ID
+			var t uint64
 			if t, err = input.ReadVarint(); err != nil {
 				return
 			} else if t & 1 == 0 {
-			} else if k, err = input.ReadFixed64(); err != nil {
+			} else if err = k.Deserialize(input); err != nil {
 				return
 			}
-			s.services[i] = &%s{Entity: &Entity{ID: i, Key: id.ID(k), Type: t >> 1}}%s
+			s.services[i] = &%s{Entity: &Entity{ID: i, Key: k, Type: t >> 1}}%s
 		}
 	case SYMBOL_DESTROY:
 		methodName = "Destroy"

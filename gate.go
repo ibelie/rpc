@@ -88,19 +88,20 @@ func (s *GateImpl) handler(gate Connection) {
 			log.Printf("[Gate@%v] Receive error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 			break
 		}
-		var t, i, k, m uint64
+		var i, k id.ID
+		var t, m uint64
 		input := &tygo.ProtoBuf{Buffer: data}
 		if t, err = input.ReadVarint(); err != nil {
 			log.Printf("[Gate@%v] Read Type error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 			break
 		}
 		if t&1 == 0 {
-		} else if i, err = input.ReadFixed64(); err != nil {
+		} else if err = i.Deserialize(input); err != nil {
 			log.Printf("[Gate@%v] Read ID error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 			break
 		}
 		if t&2 == 0 {
-		} else if k, err = input.ReadFixed64(); err != nil {
+		} else if err = k.Deserialize(input); err != nil {
 			log.Printf("[Gate@%v] Read Key error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 			break
 		}
@@ -111,18 +112,18 @@ func (s *GateImpl) handler(gate Connection) {
 		t >>= 2
 		switch m {
 		case SYMBOL_OBSERVE:
-			if components, err := s.observe(id.ID(i), id.ID(k), t, session); err != nil {
-				log.Printf("[Gate@%v] Observe %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], id.ID(i), id.ID(k), gate.Address(), session, err)
-			} else if err := gate.Send(SerializeSynchron(id.ID(i), components)); err != nil {
-				log.Printf("[Gate@%v] Send %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], id.ID(i), id.ID(k), gate.Address(), session, err)
+			if components, err := s.observe(i, k, t, session); err != nil {
+				log.Printf("[Gate@%v] Observe %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], i, k, gate.Address(), session, err)
+			} else if err := gate.Send(SerializeSynchron(i, components)); err != nil {
+				log.Printf("[Gate@%v] Send %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], i, k, gate.Address(), session, err)
 			}
 		case SYMBOL_IGNORE:
-			if err := s.ignore(id.ID(i), id.ID(k), session); err != nil {
-				log.Printf("[Gate@%v] Ignore %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], id.ID(i), id.ID(k), gate.Address(), session, err)
+			if err := s.ignore(i, k, session); err != nil {
+				log.Printf("[Gate@%v] Ignore %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], i, k, gate.Address(), session, err)
 			}
 		default:
-			if _, err := server.Distribute(id.ID(i), id.ID(k), t, m, input.Bytes()); err != nil {
-				log.Printf("[Gate@%v] Distribute %s(%v) to %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[m], m, server.symdict[t], id.ID(i), id.ID(k), gate.Address(), session, err)
+			if _, err := server.Distribute(i, k, t, m, input.Bytes()); err != nil {
+				log.Printf("[Gate@%v] Distribute %s(%v) to %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[m], m, server.symdict[t], i, k, gate.Address(), session, err)
 			}
 		}
 	}
@@ -143,10 +144,10 @@ func (s *GateImpl) Procedure(i id.ID, method uint64, param []byte) (result []byt
 		err = fmt.Errorf("[Gate] Dispatch deserialize error: %v %s(%v)\n>>>> %v", i, server.symdict[method], method, err)
 		return
 	}
-	size := 8 + tygo.SizeVarint(method) + tygo.SizeVarint(uint64(len(param))) + len(param)
+	size := i.ByteSize() + tygo.SizeVarint(method) + tygo.SizeVarint(uint64(len(param))) + len(param)
 	data := make([]byte, size)
 	output := &tygo.ProtoBuf{Buffer: data}
-	output.WriteFixed64(uint64(i))
+	i.Serialize(output)
 	output.WriteVarint(method)
 	output.WriteVarint(uint64(len(param)))
 	output.Write(param)
@@ -167,19 +168,16 @@ func (s *GateImpl) Procedure(i id.ID, method uint64, param []byte) (result []byt
 
 func SerializeSessionGate(session id.ID, gate string) (data []byte) {
 	g := []byte(gate)
-	data = make([]byte, len(g)+8)
+	data = make([]byte, len(g)+session.ByteSize())
 	output := &tygo.ProtoBuf{Buffer: data}
-	output.WriteFixed64(uint64(session))
+	session.Serialize(output)
 	output.Write(g)
 	return
 }
 
 func DeserializeSessionGate(data []byte) (session id.ID, gate string, err error) {
 	input := &tygo.ProtoBuf{Buffer: data}
-	if s, e := input.ReadFixed64(); e != nil {
-		err = e
-	} else {
-		session = id.ID(s)
+	if err = session.Deserialize(input); err == nil {
 		gate = string(input.Bytes())
 	}
 	return
@@ -187,9 +185,9 @@ func DeserializeSessionGate(data []byte) (session id.ID, gate string, err error)
 
 func SerializeDispatch(observers map[id.ID]bool, param []byte) (data []byte) {
 	var size int
-	for _, ok := range observers {
+	for observer, ok := range observers {
 		if ok {
-			size += 8
+			size += observer.ByteSize()
 		}
 	}
 	data = make([]byte, tygo.SizeVarint(uint64(size))+size+len(param))
@@ -197,7 +195,7 @@ func SerializeDispatch(observers map[id.ID]bool, param []byte) (data []byte) {
 	output.WriteVarint(uint64(size))
 	for observer, ok := range observers {
 		if ok {
-			output.WriteFixed64(uint64(observer))
+			observer.Serialize(output)
 		}
 	}
 	output.Write(param)
@@ -206,16 +204,16 @@ func SerializeDispatch(observers map[id.ID]bool, param []byte) (data []byte) {
 
 func DeserializeDispatch(data []byte) (observers []id.ID, param []byte, err error) {
 	var o []byte
-	var observer uint64
+	var observer id.ID
 	input := &tygo.ProtoBuf{Buffer: data}
 	if o, err = input.ReadBuf(); err == nil {
 		buffer := &tygo.ProtoBuf{Buffer: o}
 		param = input.Bytes()
 		for !buffer.ExpectEnd() {
-			if observer, err = buffer.ReadFixed64(); err != nil {
+			if err = observer.Deserialize(buffer); err != nil {
 				return
 			} else {
-				observers = append(observers, id.ID(observer))
+				observers = append(observers, observer)
 			}
 		}
 	}
@@ -223,14 +221,14 @@ func DeserializeDispatch(data []byte) (observers []id.ID, param []byte, err erro
 }
 
 func SerializeSynchron(i id.ID, components [][]byte) (data []byte) {
-	size := 8
+	size := i.ByteSize()
 	for _, component := range components {
 		size += len(component)
 	}
 
 	data = make([]byte, size)
 	output := &tygo.ProtoBuf{Buffer: data}
-	output.WriteFixed64(uint64(i))
+	i.Serialize(output)
 	for _, component := range components {
 		output.Write(component)
 	}
@@ -238,14 +236,14 @@ func SerializeSynchron(i id.ID, components [][]byte) (data []byte) {
 }
 
 func SerializeHandshake(i id.ID, components [][]byte) (data []byte) {
-	size := len(HANDSHAKE_DATA) + 8
+	size := len(HANDSHAKE_DATA) + i.ByteSize()
 	for _, component := range components {
 		size += len(component)
 	}
 
 	data = make([]byte, size)
 	output := &tygo.ProtoBuf{Buffer: data}
-	output.WriteFixed64(uint64(i))
+	i.Serialize(output)
 	output.Write(HANDSHAKE_DATA)
 	for _, component := range components {
 		output.Write(component)

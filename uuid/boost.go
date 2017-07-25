@@ -5,18 +5,26 @@
 package uuid
 
 import (
+	"bytes"
 	"sort"
 )
 
 type ID UUID
 
-func Compare(a ID, b ID) (c int) {
-	for i, aa := range a {
-		c = int(aa) - int(b[i])
-		if c != 0 {
-			return
-		}
-	}
+func Compare(a ID, b ID) int {
+	return bytes.Compare(a[:], b[:])
+}
+
+func (u ID) ByteSize() (size int) {
+	return 16
+}
+
+func (u ID) Serialize(writer io.Writer) {
+	writer.Write(u[:])
+}
+
+func (u *ID) Deserialize(reader io.Reader) (err error) {
+	_, err = reader.Read(u[:])
 	return
 }
 
