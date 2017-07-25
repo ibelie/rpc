@@ -134,7 +134,9 @@ func (s *GateImpl) Procedure(i ruid.RUID, method uint64, param []byte) (result [
 			break
 		}
 	}
-	err = fmt.Errorf("[Gate] Dispatch errors:\n>>>> %v", strings.Join(errors, ""))
+	if len(errors) > 0 {
+		err = fmt.Errorf("[Gate] Dispatch errors:\n>>>> %v", strings.Join(errors, ""))
+	}
 	return
 }
 

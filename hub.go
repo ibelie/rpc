@@ -73,7 +73,9 @@ func (s *HubImpl) Procedure(i ruid.RUID, method uint64, param []byte) (result []
 				errors = append(errors, fmt.Sprintf("\n>>>> gate: %v\n>>>> %v", gate, err))
 			}
 		}
-		err = fmt.Errorf("[Hub] Dispatch errors %v %s(%v):%s", i, server.symdict[method], method, strings.Join(errors, ""))
+		if len(errors) > 0 {
+			err = fmt.Errorf("[Hub] Dispatch errors %v %s(%v):%s", i, server.symdict[method], method, strings.Join(errors, ""))
+		}
 	}
 	return
 }
