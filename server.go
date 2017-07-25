@@ -12,7 +12,7 @@ import (
 
 	"github.com/ibelie/tygo"
 
-	id "github.com/ibelie/ruid"
+	id "github.com/ibelie/rpc/strid"
 )
 
 const (
@@ -172,7 +172,7 @@ func (s *_Server) Distribute(i id.ID, k id.ID, t uint64, m uint64, p []byte) (rs
 }
 
 func (s *_Server) Procedure(i id.ID, k id.ID, c uint64, m uint64, p []byte) (r []byte, err error) {
-	if k == 0 {
+	if k == id.ZERO {
 		k = i
 	}
 

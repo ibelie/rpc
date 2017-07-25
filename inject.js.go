@@ -21,6 +21,7 @@ const (
 	JS_RUID = iota
 	JS_UUID
 	JS_STRID
+	ID_TYPE = JS_STRID
 )
 
 var ID_ZERO = []string{
@@ -339,10 +340,10 @@ ibelie.rpc.Connection.prototype.send = function(entity, method, data) {
 ibelie.rpc.Connection.prototype.disconnect = function() {
 	this.socket.close();
 };
-%s`, strings.Join(requires, ""), ID_ZERO[JS_RUID],
-		ID_BYTESIZE[JS_RUID]("this.ID"), ID_BYTESIZE[JS_RUID]("this.Key"),
-		ID_WRITE[JS_RUID]("protobuf", "this.ID"), ID_WRITE[JS_RUID]("protobuf", "this.Key"),
-		ID_READ[JS_RUID]("protobuf"), ID_READ[JS_RUID]("protobuf"), ID_READ[JS_RUID]("protobuf"),
+%s`, strings.Join(requires, ""), ID_ZERO[ID_TYPE],
+		ID_BYTESIZE[ID_TYPE]("this.ID"), ID_BYTESIZE[ID_TYPE]("this.Key"),
+		ID_WRITE[ID_TYPE]("protobuf", "this.ID"), ID_WRITE[ID_TYPE]("protobuf", "this.Key"),
+		ID_READ[ID_TYPE]("protobuf"), ID_READ[ID_TYPE]("protobuf"), ID_READ[ID_TYPE]("protobuf"),
 		strings.Join(methods, ""))))
 
 	ioutil.WriteFile(path.Join(dir, "rpc.js"), buffer.Bytes(), 0666)

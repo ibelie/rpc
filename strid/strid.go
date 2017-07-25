@@ -6,11 +6,42 @@ package strid
 
 import (
 	"github.com/ibelie/tygo"
+	"math/rand"
+	"time"
 )
 
 type ID string
 
-const ZERO ID = ""
+const (
+	ZERO ID = ""
+	SIZE    = 10
+)
+
+const (
+	letterBytes   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	letterIdxBits = 6                    // 6 bits to represent a letter index
+	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
+	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
+)
+
+var src = rand.NewSource(time.Now().UnixNano())
+
+func New() ID {
+	b := make([]byte, SIZE)
+	for i, cache, remain := SIZE-1, src.Int63(), letterIdxMax; i >= 0; {
+		if remain == 0 {
+			cache, remain = src.Int63(), letterIdxMax
+		}
+		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
+			b[i] = letterBytes[idx]
+			i--
+		}
+		cache >>= letterIdxBits
+		remain--
+	}
+
+	return ID(b)
+}
 
 func (s ID) String() string {
 	return string(s)

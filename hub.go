@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	id "github.com/ibelie/ruid"
+	id "github.com/ibelie/rpc/strid"
 )
 
 type HubImpl struct {

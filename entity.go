@@ -19,9 +19,9 @@ import (
 var (
 	RPC_PKG    = map[string]string{"github.com/ibelie/rpc": ""}
 	ENTITY_PKG = map[string]string{
-		"github.com/ibelie/ruid": "id ",
-		"github.com/ibelie/rpc":  "",
-		"github.com/ibelie/tygo": "",
+		"github.com/ibelie/rpc/strid": "id ",
+		"github.com/ibelie/rpc":       "",
+		"github.com/ibelie/tygo":      "",
 	}
 )
 

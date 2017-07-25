@@ -12,7 +12,7 @@ import (
 
 	"github.com/ibelie/tygo"
 
-	id "github.com/ibelie/ruid"
+	id "github.com/ibelie/rpc/strid"
 )
 
 var (
@@ -70,9 +70,9 @@ func (s *GateImpl) ignore(i id.ID, k id.ID, session id.ID) (err error) {
 
 func (s *GateImpl) handler(gate Connection) {
 	session := id.New()
-	if _, err := server.Distribute(session, 0, SYMBOL_SESSION, SYMBOL_CREATE, OBSERVE_SESSION); err != nil {
+	if _, err := server.Distribute(session, id.ZERO, SYMBOL_SESSION, SYMBOL_CREATE, OBSERVE_SESSION); err != nil {
 		log.Printf("[Gate@%v] Create session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
-	} else if components, err := s.observe(session, 0, SYMBOL_SESSION, session); err != nil {
+	} else if components, err := s.observe(session, id.ZERO, SYMBOL_SESSION, session); err != nil {
 		log.Printf("[Gate@%v] Observe session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 	} else if err := gate.Send(SerializeHandshake(session, components)); err != nil {
 		log.Printf("[Gate@%v] Send session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
@@ -131,9 +131,9 @@ func (s *GateImpl) handler(gate Connection) {
 	GateInst.mutex.Lock()
 	delete(s.gates, session)
 	GateInst.mutex.Unlock()
-	if err := s.ignore(session, 0, session); err != nil {
+	if err := s.ignore(session, id.ZERO, session); err != nil {
 		log.Printf("[Gate@%v] Ignore session error %v:\n>>>> %v", server.Addr, session, err)
-	} else if _, err := server.Distribute(session, 0, SYMBOL_SESSION, SYMBOL_DESTROY, nil); err != nil {
+	} else if _, err := server.Distribute(session, id.ZERO, SYMBOL_SESSION, SYMBOL_DESTROY, nil); err != nil {
 		log.Printf("[Gate@%v] Destroy session error %v:\n>>>> %v", server.Addr, session, err)
 	}
 }

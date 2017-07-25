@@ -15,6 +15,10 @@ type ID UUID
 
 var ZERO = ID{}
 
+func New() ID {
+	return ID(NewV1())
+}
+
 func Compare(a ID, b ID) int {
 	return bytes.Compare(a[:], b[:])
 }
