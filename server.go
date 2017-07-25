@@ -336,9 +336,9 @@ func SerializeRequest(i ruid.RUID, ss []uint64, m uint64, p []byte) (data []byte
 	for _, s := range ss {
 		size += tygo.SizeVarint(s)
 	}
-	data = make([]byte, tygo.SizeVarint(uint64(i))+tygo.SizeVarint(m)+tygo.SizeVarint(uint64(size))+size+len(p))
+	data = make([]byte, tygo.SizeVarint(m)+tygo.SizeVarint(uint64(size))+size+len(p)+8)
 	output := &tygo.ProtoBuf{Buffer: data}
-	output.WriteVarint(uint64(i))
+	output.WriteFixed64(uint64(i))
 	output.WriteVarint(m)
 	output.WriteVarint(uint64(size))
 	for _, s := range ss {
@@ -351,7 +351,7 @@ func SerializeRequest(i ruid.RUID, ss []uint64, m uint64, p []byte) (data []byte
 func DeserializeRequest(data []byte) (i ruid.RUID, ss []uint64, m uint64, p []byte, err error) {
 	var id uint64
 	input := &tygo.ProtoBuf{Buffer: data}
-	if id, err = input.ReadVarint(); err != nil {
+	if id, err = input.ReadFixed64(); err != nil {
 	} else if m, err = input.ReadVarint(); err != nil {
 	} else if p, err = input.ReadBuf(); err != nil {
 	} else {

@@ -112,11 +112,10 @@ func (s *GateImpl) Procedure(i ruid.RUID, method uint64, param []byte) (result [
 		err = fmt.Errorf("[Gate] Dispatch deserialize error: %v %s(%v)\n>>>> %v", i, server.symdict[method], method, err)
 		return
 	}
-	size := tygo.SizeVarint(uint64(i)) + tygo.SizeVarint(method) +
-		tygo.SizeVarint(uint64(len(param))) + len(param)
+	size := 8 + tygo.SizeVarint(method) + tygo.SizeVarint(uint64(len(param))) + len(param)
 	data := make([]byte, size)
 	output := &tygo.ProtoBuf{Buffer: data}
-	output.WriteVarint(uint64(i))
+	output.WriteFixed64(uint64(i))
 	output.WriteVarint(method)
 	output.WriteVarint(uint64(len(param)))
 	output.Write(param)
@@ -135,16 +134,16 @@ func (s *GateImpl) Procedure(i ruid.RUID, method uint64, param []byte) (result [
 
 func SerializeSessionGate(session ruid.RUID, gate string) (data []byte) {
 	g := []byte(gate)
-	data = make([]byte, tygo.SizeVarint(uint64(session))+len(g))
+	data = make([]byte, len(g)+8)
 	output := &tygo.ProtoBuf{Buffer: data}
-	output.WriteVarint(uint64(session))
+	output.WriteFixed64(uint64(session))
 	output.Write(g)
 	return
 }
 
 func DeserializeSessionGate(data []byte) (session ruid.RUID, gate string, err error) {
 	input := &tygo.ProtoBuf{Buffer: data}
-	if s, e := input.ReadVarint(); e != nil {
+	if s, e := input.ReadFixed64(); e != nil {
 		err = e
 	} else {
 		session = ruid.RUID(s)
@@ -157,7 +156,7 @@ func SerializeDispatch(observers map[ruid.RUID]bool, param []byte) (data []byte)
 	var size int
 	for observer, ok := range observers {
 		if ok {
-			size += tygo.SizeVarint(uint64(observer))
+			size += 8
 		}
 	}
 	data = make([]byte, tygo.SizeVarint(uint64(size))+size+len(param))
@@ -165,7 +164,7 @@ func SerializeDispatch(observers map[ruid.RUID]bool, param []byte) (data []byte)
 	output.WriteVarint(uint64(size))
 	for observer, ok := range observers {
 		if ok {
-			output.WriteVarint(uint64(observer))
+			output.WriteFixed64(uint64(observer))
 		}
 	}
 	output.Write(param)
@@ -180,7 +179,7 @@ func DeserializeDispatch(data []byte) (observers []ruid.RUID, param []byte, err 
 		buffer := &tygo.ProtoBuf{Buffer: o}
 		param = input.Bytes()
 		for !buffer.ExpectEnd() {
-			if observer, err = buffer.ReadVarint(); err != nil {
+			if observer, err = buffer.ReadFixed64(); err != nil {
 				return
 			} else {
 				observers = append(observers, ruid.RUID(observer))
@@ -191,14 +190,14 @@ func DeserializeDispatch(data []byte) (observers []ruid.RUID, param []byte, err 
 }
 
 func SerializeSynchron(i ruid.RUID, components [][]byte) (data []byte) {
-	size := tygo.SizeVarint(uint64(i))
+	size := 8
 	for _, component := range components {
 		size += len(component)
 	}
 
 	data = make([]byte, size)
 	output := &tygo.ProtoBuf{Buffer: data}
-	output.WriteVarint(uint64(i))
+	output.WriteFixed64(uint64(i))
 	for _, component := range components {
 		output.Write(component)
 	}
@@ -211,14 +210,14 @@ func SerializeHandshake(i ruid.RUID, symbols map[string]uint64, components [][]b
 		symbol := []byte(name)
 		symbolsSize += tygo.SizeVarint(uint64(len(symbol))) + len(symbol) + tygo.SizeVarint(value)
 	}
-	size := symbolsSize + tygo.SizeVarint(uint64(symbolsSize)) + tygo.SizeVarint(uint64(i))
+	size := symbolsSize + tygo.SizeVarint(uint64(symbolsSize)) + 8
 	for _, component := range components {
 		size += len(component)
 	}
 
 	data = make([]byte, size)
 	output := &tygo.ProtoBuf{Buffer: data}
-	output.WriteVarint(uint64(i))
+	output.WriteFixed64(uint64(i))
 	output.WriteVarint(uint64(symbolsSize))
 	for symbol, value := range symbols {
 		output.WriteBuf([]byte(symbol))
