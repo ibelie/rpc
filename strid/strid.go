@@ -4,4 +4,4 @@
 
 package strid
 
-type STRID string
+type ID string

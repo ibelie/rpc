@@ -22,10 +22,10 @@ var (
 	FMT_PKG   = map[string]string{"fmt": ""}
 	STR_PKG   = map[string]string{"strings": ""}
 	LOCAL_PKG = map[string]string{
-		"fmt":                    "",
-		"sync":                   "",
+		"fmt":  "",
+		"sync": "",
+		"github.com/ibelie/ruid": "id ",
 		"github.com/ibelie/rpc":  "",
-		"github.com/ibelie/ruid": "",
 		"github.com/ibelie/tygo": "",
 	}
 	PROP_PRE = []tygo.Type{tygo.SimpleType_UINT64, tygo.SimpleType_UINT64}
@@ -149,7 +149,7 @@ func injectProcedureCallee(service *tygo.Object, method *tygo.Method) (string, m
 	case SYMBOL_%s:
 		methodName = %q
 		if service, exist := s.services[i]; !exist {
-			err = fmt.Errorf("[%s] Service %s RUID not exists: %%v", i)
+			err = fmt.Errorf("[%s] Service %s ID not exists: %%v", i)
 		}%s%s
 `, method.Name, method.Name, service.Name, method.Name, param, result), FMT_PKG
 }
@@ -184,17 +184,17 @@ func injectServiceLocal(service *tygo.Object, object *doc.Type) (string, string,
 	return fmt.Sprintf("%sInst.services", service.Name), fmt.Sprintf(`
 type %sServiceImpl struct {
 	mutex    sync.Mutex
-	services map[ruid.RUID]*%s
+	services map[id.ID]*%s
 }
 
-var %sInst = %sServiceImpl{services: make(map[ruid.RUID]*%s)}
+var %sInst = %sServiceImpl{services: make(map[id.ID]*%s)}
 
 func %sService(server rpc.Server, symbols map[string]uint64) (uint64, rpc.Service) {
 	InitializeServer(server, symbols)
 	return SYMBOL_%s, &%sInst
 }
 
-func (s *%sServiceImpl) Procedure(i ruid.RUID, method uint64, param []byte) (result []byte, err error) {
+func (s *%sServiceImpl) Procedure(i id.ID, method uint64, param []byte) (result []byte, err error) {
 	var methodName string
 	defer func() {
 		if e := recover(); e != nil {
@@ -208,7 +208,7 @@ func (s *%sServiceImpl) Procedure(i ruid.RUID, method uint64, param []byte) (res
 		s.mutex.Lock()
 		defer s.mutex.Unlock()
 		if _, exist := s.services[i]; exist {
-			err = fmt.Errorf("[%s] Service create RUID already exists: %%v", i)
+			err = fmt.Errorf("[%s] Service create ID already exists: %%v", i)
 		} else {
 			input := &tygo.ProtoBuf{Buffer: param}
 			var t, k uint64
@@ -218,21 +218,21 @@ func (s *%sServiceImpl) Procedure(i ruid.RUID, method uint64, param []byte) (res
 			} else if k, err = input.ReadFixed64(); err != nil {
 				return
 			}
-			s.services[i] = &%s{Entity: &Entity{RUID: i, Key: ruid.RUID(k), Type: t >> 1}}%s
+			s.services[i] = &%s{Entity: &Entity{ID: i, Key: id.ID(k), Type: t >> 1}}%s
 		}
 	case SYMBOL_DESTROY:
 		methodName = "Destroy"
 		s.mutex.Lock()
 		defer s.mutex.Unlock()
 		if %s, exist := s.services[i]; !exist {
-			err = fmt.Errorf("[%s] Service destroy RUID not exists: %%v", i)
+			err = fmt.Errorf("[%s] Service destroy ID not exists: %%v", i)
 		} else {%s
 			delete(s.services, i)
 		}
 	case SYMBOL_SYNCHRON:
 		methodName = "Synchron"
 		if service, exist := s.services[i]; !exist {
-			err = fmt.Errorf("[%s] Service synchron RUID not exists: %%v", i)
+			err = fmt.Errorf("[%s] Service synchron ID not exists: %%v", i)
 		} else {
 			size := service.ByteSize()
 			result = make([]byte, tygo.SizeVarint(SYMBOL_%s) + tygo.SizeVarint(uint64(size)) + size)
@@ -284,7 +284,7 @@ func injectProcedureCaller(owner string, service string, method *tygo.Method, lo
 		%s = local.%s(%s)`, strings.Join(results_list, ", "), method.Name, strings.Join(params_list, ", "))
 		result_remote = fmt.Sprintf(`
 	var result []byte
-	if result, err = Server.Procedure(s.RUID, s.Key, SYMBOL_%s, SYMBOL_%s, %s); err != nil {
+	if result, err = Server.Procedure(s.ID, s.Key, SYMBOL_%s, SYMBOL_%s, %s); err != nil {
 		return
 	}
 	%s, err = s.Deserialize%sResult(result)`, service, method.Name, param,
@@ -293,7 +293,7 @@ func injectProcedureCaller(owner string, service string, method *tygo.Method, lo
 		result_local = fmt.Sprintf(`
 		local.%s(%s)`, method.Name, strings.Join(params_list, ", "))
 		result_remote = fmt.Sprintf(`
-	_, err = Server.Procedure(s.RUID, s.Key, SYMBOL_%s, SYMBOL_%s, %s)`,
+	_, err = Server.Procedure(s.ID, s.Key, SYMBOL_%s, SYMBOL_%s, %s)`,
 			service, method.Name, param)
 	}
 
@@ -305,7 +305,7 @@ func injectProcedureCaller(owner string, service string, method *tygo.Method, lo
 			err = fmt.Errorf("[%s] Procedure %s panic:\n>>>> %%v", e)
 		}
 	}()
-	if local, exist := %s[s.RUID]; exist {%s
+	if local, exist := %s[s.ID]; exist {%s
 		return
 	}`, service, method.Name, local, result_local)
 		pkgs = update(pkgs, FMT_PKG)
@@ -334,7 +334,7 @@ func (s *%s) append%s(x ...%s) error {
 	}
 	s.%s = append(s.%s, x...)
 	e := s.Entity
-	return Server.Notify(e.RUID, e.Key, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
+	return Server.Notify(e.ID, e.Key, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
 }
 `, service.Name, strings.Title(property.Name), element_s, property.Name, property.Name,
 				property.Name, service.Name, property.Name))
@@ -352,7 +352,7 @@ func (s *%s) update%s(x %s) error {
 		s.%s[k] = v
 	}
 	e := s.Entity
-	return Server.Notify(e.RUID, e.Key, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
+	return Server.Notify(e.ID, e.Key, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
 }
 `, service.Name, strings.Title(property.Name), property_s, property.Name, property.Name,
 				property_s, property.Name, property.Name, service.Name, property.Name))
@@ -363,7 +363,7 @@ func (s *%s) update%s(x %s) error {
 func (s *%s) set%s(x %s) error {
 	s.%s = x
 	e := s.Entity
-	return Server.Notify(e.RUID, e.Key, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
+	return Server.Notify(e.ID, e.Key, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
 }
 `, service.Name, strings.Title(property.Name), property_s, property.Name, property.Name,
 				service.Name, property.Name))

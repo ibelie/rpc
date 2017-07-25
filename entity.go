@@ -19,8 +19,8 @@ import (
 var (
 	RPC_PKG    = map[string]string{"github.com/ibelie/rpc": ""}
 	ENTITY_PKG = map[string]string{
+		"github.com/ibelie/ruid": "id ",
 		"github.com/ibelie/rpc":  "",
-		"github.com/ibelie/ruid": "",
 		"github.com/ibelie/tygo": "",
 	}
 )
@@ -34,13 +34,13 @@ var (
 
 type Entity struct {
 	tygo.Tygo
-	ruid.RUID
-	Key  ruid.RUID
+	id.ID
+	Key  id.ID
 	Type uint64
 }
 
-func NewEntity(i ruid.RUID, k ruid.RUID, t string) *Entity {
-	return &Entity{RUID: i, Key: k, Type: Symbols[t]}
+func NewEntity(i id.ID, k id.ID, t string) *Entity {
+	return &Entity{ID: i, Key: k, Type: Symbols[t]}
 }
 
 func (e *Entity) Create() (err error) {
@@ -56,19 +56,19 @@ func (e *Entity) Create() (err error) {
 	if e.Key != 0 {
 		output.WriteFixed64(uint64(e.Key))
 	}
-	_, err = Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_CREATE, data)
+	_, err = Server.Distribute(e.ID, e.Key, e.Type, SYMBOL_CREATE, data)
 	return
 }
 
 func (e *Entity) Destroy() (err error) {
-	_, err = Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_DESTROY, nil)
+	_, err = Server.Distribute(e.ID, e.Key, e.Type, SYMBOL_DESTROY, nil)
 	return
 }
 
 func (e *Entity) ByteSize() (size int) {
 	if e != nil {
 		size = tygo.SizeVarint(e.Type << 2)
-		if e.RUID != 0 {
+		if e.ID != 0 {
 			size += 8
 		}
 		if e.Key != 0 {
@@ -82,15 +82,15 @@ func (e *Entity) ByteSize() (size int) {
 func (e *Entity) Serialize(output *tygo.ProtoBuf) {
 	if e != nil {
 		t := e.Type << 2
-		if e.RUID != 0 {
+		if e.ID != 0 {
 			t |= 1
 		}
 		if e.Key != 0 {
 			t |= 2
 		}
 		output.WriteVarint(t)
-		if e.RUID != 0 {
-			output.WriteFixed64(uint64(e.RUID))
+		if e.ID != 0 {
+			output.WriteFixed64(uint64(e.ID))
 		}
 		if e.Key != 0 {
 			output.WriteFixed64(uint64(e.Key))
@@ -111,9 +111,9 @@ func (e *Entity) Deserialize(input *tygo.ProtoBuf) (err error) {
 	} else if k, err = input.ReadFixed64(); err != nil {
 		return
 	}
+	e.ID = id.ID(i)
+	e.Key = id.ID(k)
 	e.Type = t >> 2
-	e.RUID = ruid.RUID(i)
-	e.Key = ruid.RUID(k)
 	return
 }
 `
@@ -446,7 +446,7 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 		pkgs = update(pkgs, STR_PKG)
 		result_declare = fmt.Sprintf("rs []%s, ", result_s)
 		result = fmt.Sprintf(`
-	if results, er := Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_%s, %s); er != nil {
+	if results, er := Server.Distribute(e.ID, e.Key, e.Type, SYMBOL_%s, %s); er != nil {
 		err = er
 	} else {
 		var errors []string
@@ -463,7 +463,7 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 	}`, method.Name, param, service.Name, method.Name, service.Name, method.Name)
 	} else {
 		result = fmt.Sprintf(`
-	_, err = Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_%s, %s)`,
+	_, err = Server.Distribute(e.ID, e.Key, e.Type, SYMBOL_%s, %s)`,
 			method.Name, param)
 	}
 

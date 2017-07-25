@@ -16,7 +16,7 @@ func randomRing(ring *Ring, n int) {
 	for i := 0; i < n; i++ {
 		buf := make([]byte, rand.Int()%10+10)
 		rand.Read(buf)
-		node, _ := ring.Get(STRID(buf))
+		node, _ := ring.Get(ID(buf))
 		if _, exist := count[node]; !exist {
 			count[node] = 0
 		}

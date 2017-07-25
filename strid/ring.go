@@ -63,7 +63,7 @@ func (r *Ring) Remove(nodes ...string) {
 	r.circle()
 }
 
-func (r *Ring) Get(key STRID) (node string, ok bool) {
+func (r *Ring) Get(key ID) (node string, ok bool) {
 	if len(r.ring) <= 0 {
 		return "", false
 	}

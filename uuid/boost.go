@@ -8,7 +8,9 @@ import (
 	"sort"
 )
 
-func Compare(a UUID, b UUID) (c int) {
+type ID UUID
+
+func Compare(a ID, b ID) (c int) {
 	for i, aa := range a {
 		c = int(aa) - int(b[i])
 		if c != 0 {
@@ -18,9 +20,9 @@ func Compare(a UUID, b UUID) (c int) {
 	return
 }
 
-type UUIDSlice []UUID
+type IDSlice []ID
 
-func (s UUIDSlice) Len() int           { return len(s) }
-func (s UUIDSlice) Less(i, j int) bool { return Compare(s[i], s[j]) < 0 }
-func (s UUIDSlice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s UUIDSlice) Sort()              { sort.Sort(s) }
+func (s IDSlice) Len() int           { return len(s) }
+func (s IDSlice) Less(i, j int) bool { return Compare(s[i], s[j]) < 0 }
+func (s IDSlice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s IDSlice) Sort()              { sort.Sort(s) }

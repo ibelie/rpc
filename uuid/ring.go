@@ -16,9 +16,9 @@ const (
 )
 
 type Ring struct {
-	sorted  UUIDSlice
+	sorted  IDSlice
 	weights map[string]int
-	ring    map[UUID]string
+	ring    map[ID]string
 }
 
 func NewRing(nodes ...string) *Ring {
@@ -63,11 +63,11 @@ func (r *Ring) Remove(nodes ...string) {
 	r.circle()
 }
 
-func (r *Ring) Get(key UUID) (node string, ok bool) {
+func (r *Ring) Get(key ID) (node string, ok bool) {
 	if len(r.ring) <= 0 {
 		return "", false
 	}
-	hash := UUID(md5.Sum(key[:]))
+	hash := ID(md5.Sum(key[:]))
 	pos := sort.Search(len(r.sorted), func(i int) bool { return Compare(r.sorted[i], hash) >= 0 })
 	if pos == len(r.sorted) {
 		pos = 0
@@ -75,7 +75,7 @@ func (r *Ring) Get(key UUID) (node string, ok bool) {
 	return r.ring[r.sorted[pos]], true
 }
 
-func (r *Ring) GetNoHash(key UUID) (node string, ok bool) {
+func (r *Ring) GetNoHash(key ID) (node string, ok bool) {
 	if len(r.ring) <= 0 {
 		return "", false
 	}
@@ -97,14 +97,14 @@ func (r *Ring) circle() {
 	}
 
 	r.sorted = nil
-	r.ring = make(map[UUID]string)
+	r.ring = make(map[ID]string)
 	for node, weight := range r.weights {
 		factor := len(r.weights) * weight * virtual / total
 		if factor < 1 {
 			factor = 1
 		}
 		for i := 0; i < int(factor); i++ {
-			key := UUID(md5.Sum([]byte(fmt.Sprintf("%s-%d", node, i))))
+			key := ID(md5.Sum([]byte(fmt.Sprintf("%s-%d", node, i))))
 			r.ring[key] = node
 			r.sorted = append(r.sorted, key)
 		}

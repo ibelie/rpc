@@ -79,22 +79,22 @@ goog.require('tyts.String');
 goog.require('tyts.ProtoBuf');
 goog.require('tyts.SizeVarint');%s
 
-var ZERO_RUID = 'AAAAAAAAAAA';
+var ZERO_ID = 'AAAAAAAAAAA';
 
 Entity = function() {
 	this.__class__ = 'Entity';
 	this.isAwake = false;
-	this.RUID = ZERO_RUID;
-	this.Key  = ZERO_RUID;
+	this.ID = ZERO_ID;
+	this.Key = ZERO_ID;
 	this.Type = 0;
 };
 
 Entity.prototype.ByteSize = function() {
 	var size = tyts.SizeVarint(this.Type << 2);
-	if (this.RUID != ZERO_RUID) {
+	if (this.ID != ZERO_ID) {
 		size += 8;
 	}
-	if (this.Key != ZERO_RUID) {
+	if (this.Key != ZERO_ID) {
 		size += 8;
 	}
 	return size;
@@ -102,17 +102,17 @@ Entity.prototype.ByteSize = function() {
 
 Entity.prototype.SerializeUnsealed = function(protobuf) {
 	var t = this.Type << 2;
-	if (this.RUID != ZERO_RUID) {
+	if (this.ID != ZERO_ID) {
 		t |= 1;
 	}
-	if (this.Key != ZERO_RUID) {
+	if (this.Key != ZERO_ID) {
 		t |= 2;
 	}
 	protobuf.WriteVarint(t);
-	if (this.RUID != ZERO_RUID) {
-		protobuf.WriteBase64(this.RUID);
+	if (this.ID != ZERO_ID) {
+		protobuf.WriteBase64(this.ID);
 	}
-	if (this.Key != ZERO_RUID) {
+	if (this.Key != ZERO_ID) {
 		protobuf.WriteBase64(this.Key);
 	}
 };
@@ -126,9 +126,9 @@ Entity.prototype.Serialize = function() {
 Entity.prototype.Deserialize = function(data) {
 	var protobuf = new tyts.ProtoBuf(data);
 	var t = protobuf.ReadVarint();
+	this.ID = (t & 1) ? protobuf.ReadBase64(8) : ZERO_ID;
+	this.Key = (t & 2) ? protobuf.ReadBase64(8) : ZERO_ID;
 	this.Type = t >>> 2;
-	this.RUID = (t & 1) ? protobuf.ReadBase64(8) : ZERO_RUID;
-	this.Key  = (t & 2) ? protobuf.ReadBase64(8) : ZERO_RUID;
 };
 
 var ibelie = {};
@@ -145,17 +145,17 @@ ibelie.rpc.Component.prototype.Awake = function(e) {
 		return e;
 	}
 	var conn = this.Entity.connection;
-	var entity = conn.entities[e.RUID];
+	var entity = conn.entities[e.ID];
 	if (entity) {
 		return entity
 	}
 	entity = new entities[ibelie.rpc.Dictionary[e.Type]]();
-	entity.RUID	= e.RUID;
-	entity.Key	= e.Key;
+	entity.ID = e.ID;
+	entity.Key = e.Key;
 	entity.Type	= e.Type;
 	entity.connection = conn;
 	conn.send(e, ibelie.rpc.Symbols.OBSERVE);
-	conn.entities[entity.RUID] = entity;
+	conn.entities[entity.ID] = entity;
 	return entity;
 };
 
@@ -174,10 +174,10 @@ ibelie.rpc.Component.prototype.Drop = function(e) {
 	e.isAwake = false;
 	var conn = this.Entity.connection;
 	conn.send(e, ibelie.rpc.Symbols.IGNORE);
-	delete conn.entities[e.RUID];
+	delete conn.entities[e.ID];
 	var entity = new Entity();
-	entity.RUID	= e.RUID;
-	entity.Key	= e.Key;
+	entity.ID = e.ID;
+	entity.Key = e.Key;
 	entity.Type	= e.Type;
 	return entity;
 };
@@ -203,9 +203,9 @@ ibelie.rpc.Connection = function(url) {
 				var t = protobuf.ReadVarint();
 				entity = new entities[ibelie.rpc.Dictionary[t]]();
 				entity.connection = conn;
+				entity.ID = id;
+				entity.Key = ZERO_ID;
 				entity.Type = t;
-				entity.RUID = id;
-				entity.Key  = ZERO_RUID;
 				conn.entities[id] = entity;
 			} else {
 				entity = conn.entities[id];
