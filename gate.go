@@ -63,35 +63,41 @@ func (s *GateImpl) handler(gate Connection) {
 			log.Printf("[Gate@%v] Receive error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 			break
 		}
+		var t, i, k, m uint64
 		input := &tygo.ProtoBuf{Buffer: data}
-		if i, err := input.ReadVarint(); err != nil {
-			log.Printf("[Gate@%v] Read RUID error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
-			break
-		} else if k, err := input.ReadVarint(); err != nil {
-			log.Printf("[Gate@%v] Read Key error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
-			break
-		} else if t, err := input.ReadVarint(); err != nil {
+		if t, err = input.ReadVarint(); err != nil {
 			log.Printf("[Gate@%v] Read Type error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 			break
-		} else if m, err := input.ReadVarint(); err != nil {
+		}
+		if t&1 == 0 {
+		} else if i, err = input.ReadFixed64(); err != nil {
+			log.Printf("[Gate@%v] Read RUID error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
+			break
+		}
+		if t&2 == 0 {
+		} else if k, err = input.ReadFixed64(); err != nil {
+			log.Printf("[Gate@%v] Read Key error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
+			break
+		}
+		if m, err = input.ReadVarint(); err != nil {
 			log.Printf("[Gate@%v] Read method error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 			break
-		} else {
-			switch m {
-			case SYMBOL_OBSERVE:
-				if components, err := s.observe(ruid.RUID(i), ruid.RUID(k), t, session); err != nil {
-					log.Printf("[Gate@%v] Observe %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], ruid.RUID(i), ruid.RUID(k), gate.Address(), session, err)
-				} else if err := gate.Send(SerializeSynchron(ruid.RUID(i), components)); err != nil {
-					log.Printf("[Gate@%v] Send %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], ruid.RUID(i), ruid.RUID(k), gate.Address(), session, err)
-				}
-			case SYMBOL_IGNORE:
-				if err := s.ignore(ruid.RUID(i), ruid.RUID(k), session); err != nil {
-					log.Printf("[Gate@%v] Ignore %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], ruid.RUID(i), ruid.RUID(k), gate.Address(), session, err)
-				}
-			default:
-				if _, err := server.Distribute(ruid.RUID(i), ruid.RUID(k), t, m, input.Bytes()); err != nil {
-					log.Printf("[Gate@%v] Distribute %s(%v) to %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[m], m, server.symdict[t], ruid.RUID(i), ruid.RUID(k), gate.Address(), session, err)
-				}
+		}
+		t >>= 2
+		switch m {
+		case SYMBOL_OBSERVE:
+			if components, err := s.observe(ruid.RUID(i), ruid.RUID(k), t, session); err != nil {
+				log.Printf("[Gate@%v] Observe %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], ruid.RUID(i), ruid.RUID(k), gate.Address(), session, err)
+			} else if err := gate.Send(SerializeSynchron(ruid.RUID(i), components)); err != nil {
+				log.Printf("[Gate@%v] Send %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], ruid.RUID(i), ruid.RUID(k), gate.Address(), session, err)
+			}
+		case SYMBOL_IGNORE:
+			if err := s.ignore(ruid.RUID(i), ruid.RUID(k), session); err != nil {
+				log.Printf("[Gate@%v] Ignore %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], ruid.RUID(i), ruid.RUID(k), gate.Address(), session, err)
+			}
+		default:
+			if _, err := server.Distribute(ruid.RUID(i), ruid.RUID(k), t, m, input.Bytes()); err != nil {
+				log.Printf("[Gate@%v] Distribute %s(%v) to %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[m], m, server.symdict[t], ruid.RUID(i), ruid.RUID(k), gate.Address(), session, err)
 			}
 		}
 	}
@@ -154,7 +160,7 @@ func DeserializeSessionGate(data []byte) (session ruid.RUID, gate string, err er
 
 func SerializeDispatch(observers map[ruid.RUID]bool, param []byte) (data []byte) {
 	var size int
-	for observer, ok := range observers {
+	for _, ok := range observers {
 		if ok {
 			size += 8
 		}

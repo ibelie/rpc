@@ -44,10 +44,18 @@ func NewEntity(i ruid.RUID, k ruid.RUID, t string) *Entity {
 }
 
 func (e *Entity) Create() (err error) {
-	data := make([]byte, tygo.SizeVarint(uint64(e.Key))+tygo.SizeVarint(e.Type))
+	t := e.Type << 1
+	size := tygo.SizeVarint(t)
+	if e.Key != 0 {
+		size += 8
+		t &= 1
+	}
+	data := make([]byte, size)
 	output := &tygo.ProtoBuf{Buffer: data}
-	output.WriteVarint(uint64(e.Key))
-	output.WriteVarint(e.Type)
+	output.WriteVarint(t)
+	if e.Key != 0 {
+		output.WriteFixed64(uint64(e.Key))
+	}
 	_, err = Server.Distribute(e.RUID, e.Key, e.Type, SYMBOL_CREATE, data)
 	return
 }
@@ -59,7 +67,13 @@ func (e *Entity) Destroy() (err error) {
 
 func (e *Entity) ByteSize() (size int) {
 	if e != nil {
-		size = tygo.SizeVarint(uint64(e.RUID)) + tygo.SizeVarint(uint64(e.Key)) + tygo.SizeVarint(e.Type)
+		size = tygo.SizeVarint(e.Type << 2)
+		if e.RUID != 0 {
+			size += 8
+		}
+		if e.Key != 0 {
+			size += 8
+		}
 		e.SetCachedSize(size)
 	}
 	return
@@ -67,21 +81,37 @@ func (e *Entity) ByteSize() (size int) {
 
 func (e *Entity) Serialize(output *tygo.ProtoBuf) {
 	if e != nil {
-		output.WriteVarint(uint64(e.RUID))
-		output.WriteVarint(uint64(e.Key))
-		output.WriteVarint(e.Type)
+		t := e.Type << 2
+		if e.RUID != 0 {
+			t &= 1
+		}
+		if e.Key != 0 {
+			t &= 2
+		}
+		output.WriteVarint(t)
+		if e.RUID != 0 {
+			output.WriteFixed64(uint64(e.RUID))
+		}
+		if e.Key != 0 {
+			output.WriteFixed64(uint64(e.Key))
+		}
 	}
 }
 
 func (e *Entity) Deserialize(input *tygo.ProtoBuf) (err error) {
-	var i, k uint64
-	if i, err = input.ReadVarint(); err != nil {
-		return
-	} else if k, err = input.ReadVarint(); err != nil {
-		return
-	} else if e.Type, err = input.ReadVarint(); err != nil {
+	var t, i, k uint64
+	if t, err = input.ReadVarint(); err != nil {
 		return
 	}
+	if t&1 == 0 {
+	} else if i, err = input.ReadFixed64(); err != nil {
+		return
+	}
+	if t&2 == 0 {
+	} else if k, err = input.ReadFixed64(); err != nil {
+		return
+	}
+	e.Type = t >> 2
 	e.RUID = ruid.RUID(i)
 	e.Key = ruid.RUID(k)
 	return
