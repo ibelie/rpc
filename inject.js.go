@@ -103,10 +103,10 @@ Entity.prototype.ByteSize = function() {
 Entity.prototype.SerializeUnsealed = function(protobuf) {
 	var t = this.Type << 2;
 	if (this.RUID != ZERO_RUID) {
-		t &= 1;
+		t |= 1;
 	}
 	if (this.Key != ZERO_RUID) {
-		t &= 2;
+		t |= 2;
 	}
 	protobuf.WriteVarint(t);
 	if (this.RUID != ZERO_RUID) {

@@ -48,7 +48,7 @@ func (e *Entity) Create() (err error) {
 	size := tygo.SizeVarint(t)
 	if e.Key != 0 {
 		size += 8
-		t &= 1
+		t |= 1
 	}
 	data := make([]byte, size)
 	output := &tygo.ProtoBuf{Buffer: data}
@@ -83,10 +83,10 @@ func (e *Entity) Serialize(output *tygo.ProtoBuf) {
 	if e != nil {
 		t := e.Type << 2
 		if e.RUID != 0 {
-			t &= 1
+			t |= 1
 		}
 		if e.Key != 0 {
-			t &= 2
+			t |= 2
 		}
 		output.WriteVarint(t)
 		if e.RUID != 0 {
