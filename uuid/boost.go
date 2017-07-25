@@ -6,13 +6,21 @@ package uuid
 
 import (
 	"bytes"
+	"encoding/base64"
+	"io"
 	"sort"
 )
 
 type ID UUID
 
+var ZERO = ID{}
+
 func Compare(a ID, b ID) int {
 	return bytes.Compare(a[:], b[:])
+}
+
+func (u ID) String() string {
+	return base64.RawURLEncoding.EncodeToString(u[:])
 }
 
 func (u ID) ByteSize() (size int) {

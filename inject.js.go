@@ -7,12 +7,63 @@ package rpc
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"path"
 	"sort"
 	"strings"
 
-	"io/ioutil"
+	"github.com/ibelie/rpc/strid"
+	"github.com/ibelie/rpc/uuid"
+	"github.com/ibelie/ruid"
 )
+
+const (
+	JS_RUID = iota
+	JS_UUID
+	JS_STRID
+)
+
+var ID_ZERO = []string{
+	ruid.ZERO.String(),
+	uuid.ZERO.String(),
+	strid.ZERO.String(),
+}
+
+var ID_BYTESIZE = []func(string) string{
+	func(value string) string {
+		return fmt.Sprintf("8")
+	},
+	func(value string) string {
+		return fmt.Sprintf("16")
+	},
+	func(value string) string {
+		return fmt.Sprintf("tyts.String.ByteSize(%s, 0, false)", value)
+	},
+}
+
+var ID_WRITE = []func(string, string) string{
+	func(protobuf string, value string) string {
+		return fmt.Sprintf("%s.WriteBase64(%s)", protobuf, value)
+	},
+	func(protobuf string, value string) string {
+		return fmt.Sprintf("%s.WriteBase64(%s)", protobuf, value)
+	},
+	func(protobuf string, value string) string {
+		return fmt.Sprintf("tyts.String.Serialize(%s, 0, false, %s)", value, protobuf)
+	},
+}
+
+var ID_READ = []func(string) string{
+	func(protobuf string) string {
+		return fmt.Sprintf("%s.ReadBase64(8)", protobuf)
+	},
+	func(protobuf string) string {
+		return fmt.Sprintf("%s.ReadBase64(16)", protobuf)
+	},
+	func(protobuf string) string {
+		return fmt.Sprintf("tyts.String.Deserialize(null, %s)", protobuf)
+	},
+}
 
 func injectJavascript(dir string, entities []*Entity) {
 	var buffer bytes.Buffer
@@ -79,7 +130,7 @@ goog.require('tyts.String');
 goog.require('tyts.ProtoBuf');
 goog.require('tyts.SizeVarint');%s
 
-var ZERO_ID = 'AAAAAAAAAAA';
+var ZERO_ID = %q;
 
 Entity = function() {
 	this.__class__ = 'Entity';
@@ -92,10 +143,10 @@ Entity = function() {
 Entity.prototype.ByteSize = function() {
 	var size = tyts.SizeVarint(this.Type << 2);
 	if (this.ID != ZERO_ID) {
-		size += 8;
+		size += %s;
 	}
 	if (this.Key != ZERO_ID) {
-		size += 8;
+		size += %s;
 	}
 	return size;
 };
@@ -110,10 +161,10 @@ Entity.prototype.SerializeUnsealed = function(protobuf) {
 	}
 	protobuf.WriteVarint(t);
 	if (this.ID != ZERO_ID) {
-		protobuf.WriteBase64(this.ID);
+		%s;
 	}
 	if (this.Key != ZERO_ID) {
-		protobuf.WriteBase64(this.Key);
+		%s;
 	}
 };
 
@@ -126,8 +177,8 @@ Entity.prototype.Serialize = function() {
 Entity.prototype.Deserialize = function(data) {
 	var protobuf = new tyts.ProtoBuf(data);
 	var t = protobuf.ReadVarint();
-	this.ID = (t & 1) ? protobuf.ReadBase64(8) : ZERO_ID;
-	this.Key = (t & 2) ? protobuf.ReadBase64(8) : ZERO_ID;
+	this.ID = (t & 1) ? %s : ZERO_ID;
+	this.Key = (t & 2) ? %s : ZERO_ID;
 	this.Type = t >>> 2;
 };
 
@@ -189,7 +240,7 @@ ibelie.rpc.Connection = function(url) {
 		socket.onmessage = function(event) {
 			var entity;
 			var protobuf = tyts.ProtoBuf.FromBase64(event.data);
-			var id = protobuf.ReadBase64(8);
+			var id = %s;
 			if (!ibelie.rpc.Symbols) {
 				ibelie.rpc.Symbols = {};
 				ibelie.rpc.Dictionary = {};
@@ -288,7 +339,11 @@ ibelie.rpc.Connection.prototype.send = function(entity, method, data) {
 ibelie.rpc.Connection.prototype.disconnect = function() {
 	this.socket.close();
 };
-%s`, strings.Join(requires, ""), strings.Join(methods, ""))))
+%s`, strings.Join(requires, ""), ID_ZERO[JS_RUID],
+		ID_BYTESIZE[JS_RUID]("this.ID"), ID_BYTESIZE[JS_RUID]("this.Key"),
+		ID_WRITE[JS_RUID]("protobuf", "this.ID"), ID_WRITE[JS_RUID]("protobuf", "this.Key"),
+		ID_READ[JS_RUID]("protobuf"), ID_READ[JS_RUID]("protobuf"), ID_READ[JS_RUID]("protobuf"),
+		strings.Join(methods, ""))))
 
 	ioutil.WriteFile(path.Join(dir, "rpc.js"), buffer.Bytes(), 0666)
 }

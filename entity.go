@@ -46,14 +46,14 @@ func NewEntity(i id.ID, k id.ID, t string) *Entity {
 func (e *Entity) Create() (err error) {
 	t := e.Type << 1
 	size := tygo.SizeVarint(t)
-	if e.Key != 0 {
+	if e.Key != id.ZERO {
 		size += e.Key.ByteSize()
 		t |= 1
 	}
 	data := make([]byte, size)
 	output := &tygo.ProtoBuf{Buffer: data}
 	output.WriteVarint(t)
-	if e.Key != 0 {
+	if e.Key != id.ZERO {
 		e.Key.Serialize(output)
 	}
 	_, err = Server.Distribute(e.ID, e.Key, e.Type, SYMBOL_CREATE, data)
@@ -68,10 +68,10 @@ func (e *Entity) Destroy() (err error) {
 func (e *Entity) ByteSize() (size int) {
 	if e != nil {
 		size = tygo.SizeVarint(e.Type << 2)
-		if e.ID != 0 {
+		if e.ID != id.ZERO {
 			size += e.ID.ByteSize()
 		}
-		if e.Key != 0 {
+		if e.Key != id.ZERO {
 			size += e.Key.ByteSize()
 		}
 		e.SetCachedSize(size)
@@ -82,17 +82,17 @@ func (e *Entity) ByteSize() (size int) {
 func (e *Entity) Serialize(output *tygo.ProtoBuf) {
 	if e != nil {
 		t := e.Type << 2
-		if e.ID != 0 {
+		if e.ID != id.ZERO {
 			t |= 1
 		}
-		if e.Key != 0 {
+		if e.Key != id.ZERO {
 			t |= 2
 		}
 		output.WriteVarint(t)
-		if e.ID != 0 {
+		if e.ID != id.ZERO {
 			e.ID.Serialize(output)
 		}
-		if e.Key != 0 {
+		if e.Key != id.ZERO {
 			e.Key.Serialize(output)
 		}
 	}
