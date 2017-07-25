@@ -14,6 +14,12 @@ import (
 	"github.com/ibelie/tygo"
 )
 
+var (
+	SYMBOL_SESSION  uint64
+	OBSERVE_SESSION []byte
+	HANDSHAKE_DATA  []byte
+)
+
 type GateImpl struct {
 	mutex sync.Mutex
 	gates map[ruid.RUID]Connection
@@ -25,7 +31,25 @@ func GateService(_ Server, _ map[string]uint64) (uint64, Service) {
 	return SYMBOL_GATE, &GateInst
 }
 
-func Gate(address string, network Network) {
+func Gate(address string, session string, network Network) {
+	SYMBOL_SESSION = server.symbols[session]
+	OBSERVE_SESSION = make([]byte, tygo.SizeVarint(SYMBOL_SESSION<<1))
+	(&tygo.ProtoBuf{Buffer: OBSERVE_SESSION}).WriteVarint(SYMBOL_SESSION << 1)
+
+	syms := 0
+	for name, value := range server.symbols {
+		symbol := []byte(name)
+		syms += tygo.SizeVarint(uint64(len(symbol))) + len(symbol) + tygo.SizeVarint(value)
+	}
+	HANDSHAKE_DATA = make([]byte, syms+tygo.SizeVarint(uint64(syms))+tygo.SizeVarint(SYMBOL_SESSION))
+	output := &tygo.ProtoBuf{Buffer: HANDSHAKE_DATA}
+	output.WriteVarint(uint64(syms))
+	for symbol, value := range server.symbols {
+		output.WriteBuf([]byte(symbol))
+		output.WriteVarint(value)
+	}
+	output.WriteVarint(SYMBOL_SESSION)
+
 	network.Serve(address, GateInst.handler)
 }
 
@@ -45,11 +69,11 @@ func (s *GateImpl) ignore(i ruid.RUID, k ruid.RUID, session ruid.RUID) (err erro
 
 func (s *GateImpl) handler(gate Connection) {
 	session := ruid.New()
-	if _, err := server.Distribute(session, 0, SYMBOL_SESSION, SYMBOL_CREATE, []byte{0, byte(SYMBOL_SESSION)}); err != nil {
+	if _, err := server.Distribute(session, 0, SYMBOL_SESSION, SYMBOL_CREATE, OBSERVE_SESSION); err != nil {
 		log.Printf("[Gate@%v] Create session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 	} else if components, err := s.observe(session, 0, SYMBOL_SESSION, session); err != nil {
 		log.Printf("[Gate@%v] Observe session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
-	} else if err := gate.Send(SerializeHandshake(session, server.symbols, components)); err != nil {
+	} else if err := gate.Send(SerializeHandshake(session, components)); err != nil {
 		log.Printf("[Gate@%v] Send session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 	}
 
@@ -212,13 +236,8 @@ func SerializeSynchron(i ruid.RUID, components [][]byte) (data []byte) {
 	return
 }
 
-func SerializeHandshake(i ruid.RUID, symbols map[string]uint64, components [][]byte) (data []byte) {
-	symbolsSize := 0
-	for name, value := range symbols {
-		symbol := []byte(name)
-		symbolsSize += tygo.SizeVarint(uint64(len(symbol))) + len(symbol) + tygo.SizeVarint(value)
-	}
-	size := symbolsSize + tygo.SizeVarint(uint64(symbolsSize)) + 8
+func SerializeHandshake(i ruid.RUID, components [][]byte) (data []byte) {
+	size := len(HANDSHAKE_DATA) + 8
 	for _, component := range components {
 		size += len(component)
 	}
@@ -226,11 +245,7 @@ func SerializeHandshake(i ruid.RUID, symbols map[string]uint64, components [][]b
 	data = make([]byte, size)
 	output := &tygo.ProtoBuf{Buffer: data}
 	output.WriteFixed64(uint64(i))
-	output.WriteVarint(uint64(symbolsSize))
-	for symbol, value := range symbols {
-		output.WriteBuf([]byte(symbol))
-		output.WriteVarint(value)
-	}
+	output.Write(HANDSHAKE_DATA)
 	for _, component := range components {
 		output.Write(component)
 	}

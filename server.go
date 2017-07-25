@@ -15,8 +15,7 @@ import (
 )
 
 const (
-	SYMBOL_SESSION uint64 = iota
-	SYMBOL_GATE
+	SYMBOL_GATE uint64 = iota
 	SYMBOL_HUB
 	SYMBOL_CREATE
 	SYMBOL_DESTROY
@@ -27,7 +26,6 @@ const (
 )
 
 var BUILTIN_SYMBOLS = []string{
-	"Session",
 	"GATE",
 	"HUB",
 	"CREATE",

@@ -200,9 +200,10 @@ ibelie.rpc.Connection = function(url) {
 					ibelie.rpc.Symbols[symbol] = value;
 					ibelie.rpc.Dictionary[value] = symbol;
 				}
-				entity = new entities.Session();
+				var t = protobuf.ReadVarint();
+				entity = new entities[ibelie.rpc.Dictionary[t]]();
 				entity.connection = conn;
-				entity.Type = ibelie.rpc.Symbols.Session;
+				entity.Type = t;
 				entity.RUID = id;
 				entity.Key  = ZERO_RUID;
 				conn.entities[id] = entity;

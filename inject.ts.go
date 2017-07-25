@@ -111,7 +111,6 @@ declare module ibelie.rpc {
 
 	class Connection {
 		socket: WebSocket;
-		session: entities.Session;
 		entities: {[index: string]: Entity};
 		constructor(url: string);
 		disconnect(): void;
