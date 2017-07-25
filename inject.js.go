@@ -203,7 +203,7 @@ ibelie.rpc.Connection = function(url) {
 				entity = new entities.Session();
 				entity.connection = conn;
 				entity.Type = ibelie.rpc.Symbols.Session;
-				entity.Key  = 0;
+				entity.Key  = ZERO_RUID;
 				conn.entities[id] = entity;
 			} else {
 				entity = conn.entities[id];
