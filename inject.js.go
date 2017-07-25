@@ -223,27 +223,28 @@ ibelie.rpc.Connection = function(url) {
 					continue;
 				} else if (name == 'NOTIFY') {
 					var buffer = new tyts.ProtoBuf(data);
-					var component = ibelie.rpc.Dictionary[buffer.ReadVarint()];
+					var compName = ibelie.rpc.Dictionary[buffer.ReadVarint()];
 					var property = ibelie.rpc.Dictionary[buffer.ReadVarint()];
-					var newValue = ibelie.rpc[component]['Deserialize' + property](buffer.Bytes())[0];
-					var oldValue = entity[component][property];
-					var handler = entity[component][property + 'Handler'];
+					var newValue = ibelie.rpc[compName]['Deserialize' + property](buffer.Bytes())[0];
+					var component = entity[compName];
+					var oldValue = component[property];
+					var handler = component[property + 'Handler'];
 					if (oldValue.concat) {
-						entity[component][property] = oldValue.concat(newValue);
-						handler && handler(oldValue, newValue);
+						component[property] = oldValue.concat(newValue);
+						handler && handler.call(component, oldValue, newValue);
 					} else if ((newValue instanceof Object) && !newValue.__class__) {
-						if (!entity[component][property]) {
-							entity[component][property] = {};
+						if (!component[property]) {
+							component[property] = {};
 						}
 						for (var k in newValue) {
 							var o = oldValue[k];
 							var n = newValue[k];
 							oldValue[k] = n;
-							handler && handler(k, o, n);
+							handler && handler.call(component, k, o, n);
 						}
 					} else {
-						entity[component][property] = newValue;
-						handler && handler(oldValue, newValue);
+						component[property] = newValue;
+						handler && handler.call(component, oldValue, newValue);
 					}
 				} else {
 					var args = entity['Deserialize' + name](data);
