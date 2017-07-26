@@ -22,10 +22,10 @@ var (
 	FMT_PKG   = map[string]string{"fmt": ""}
 	STR_PKG   = map[string]string{"strings": ""}
 	LOCAL_PKG = map[string]string{
-		"fmt":  "",
-		"sync": "",
-		"github.com/ibelie/ruid": "id ",
+		"fmt":                    "",
+		"sync":                   "",
 		"github.com/ibelie/rpc":  "",
+		"github.com/ibelie/ruid": "",
 		"github.com/ibelie/tygo": "",
 	}
 	PROP_PRE = []tygo.Type{tygo.SimpleType_UINT64, tygo.SimpleType_UINT64}
@@ -184,17 +184,17 @@ func injectServiceLocal(service *tygo.Object, object *doc.Type) (string, string,
 	return fmt.Sprintf("%sInst.services", service.Name), fmt.Sprintf(`
 type %sServiceImpl struct {
 	mutex    sync.Mutex
-	services map[id.ID]*%s
+	services map[ruid.ID]*%s
 }
 
-var %sInst = %sServiceImpl{services: make(map[id.ID]*%s)}
+var %sInst = %sServiceImpl{services: make(map[ruid.ID]*%s)}
 
 func %sService(server rpc.Server, symbols map[string]uint64) (uint64, rpc.Service) {
 	InitializeServer(server, symbols)
 	return SYMBOL_%s, &%sInst
 }
 
-func (s *%sServiceImpl) Procedure(i id.ID, method uint64, param []byte) (result []byte, err error) {
+func (s *%sServiceImpl) Procedure(i ruid.ID, method uint64, param []byte) (result []byte, err error) {
 	var methodName string
 	defer func() {
 		if e := recover(); e != nil {
@@ -211,12 +211,13 @@ func (s *%sServiceImpl) Procedure(i id.ID, method uint64, param []byte) (result 
 			err = fmt.Errorf("[%s] Service create ID already exists: %%v", i)
 		} else {
 			input := &tygo.ProtoBuf{Buffer: param}
-			var k id.ID
 			var t uint64
+			var k ruid.ID
 			if t, err = input.ReadVarint(); err != nil {
 				return
 			} else if t & 1 == 0 {
-			} else if err = k.Deserialize(input); err != nil {
+				k = Server.ZeroID()
+			} else if k, err = Server.DeserializeID(input); err != nil {
 				return
 			}
 			s.services[i] = &%s{Entity: &Entity{ID: i, Key: k, Type: t >> 1}}%s

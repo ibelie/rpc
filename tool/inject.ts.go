@@ -10,11 +10,11 @@ import (
 )
 
 func main() {
+	ident := flag.String("id", "", "identifier type")
 	input := flag.String("in", "", "input entities.ts")
 	tsOut := flag.String("ts", "", "output typescript dir")
 	goOut := flag.String("go", "", "output golang dir")
 	flag.Parse()
-	entities := rpc.Typescript(*input, *tsOut)
-	rpc.Symbols(*goOut, entities)
-	rpc.Routes(*goOut, entities)
+	entities := rpc.Typescript(*ident, *input, *tsOut)
+	rpc.Proxy(*ident, *goOut, entities)
 }

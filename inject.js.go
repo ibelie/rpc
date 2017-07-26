@@ -17,20 +17,13 @@ import (
 	"github.com/ibelie/ruid"
 )
 
-const (
-	JS_RUID = iota
-	JS_UUID
-	JS_STRID
-	ID_TYPE = JS_RUID
-)
-
-var ID_ZERO = []string{
+var JSID_ZERO = []string{
 	ruid.ZERO.String(),
 	uuid.ZERO.String(),
 	strid.ZERO.String(),
 }
 
-var ID_BYTESIZE = []func(string) string{
+var JSID_BYTESIZE = []func(string) string{
 	func(value string) string {
 		return fmt.Sprintf("8")
 	},
@@ -42,7 +35,7 @@ var ID_BYTESIZE = []func(string) string{
 	},
 }
 
-var ID_WRITE = []func(string, string) string{
+var JSID_WRITE = []func(string, string) string{
 	func(protobuf string, value string) string {
 		return fmt.Sprintf("%s.WriteBase64(%s)", protobuf, value)
 	},
@@ -54,7 +47,7 @@ var ID_WRITE = []func(string, string) string{
 	},
 }
 
-var ID_READ = []func(string) string{
+var JSID_READ = []func(string) string{
 	func(protobuf string) string {
 		return fmt.Sprintf("%s.ReadBase64(8)", protobuf)
 	},
@@ -66,7 +59,8 @@ var ID_READ = []func(string) string{
 	},
 }
 
-func injectJavascript(dir string, entities []*Entity) {
+func injectJavascript(identName string, dir string, entities []*Entity) {
+	ident := IDENT_FromString(identName)
 	var buffer bytes.Buffer
 	requireMap := make(map[string]bool)
 	methodsMap := make(map[string]bool)
@@ -340,10 +334,10 @@ ibelie.rpc.Connection.prototype.send = function(entity, method, data) {
 ibelie.rpc.Connection.prototype.disconnect = function() {
 	this.socket.close();
 };
-%s`, strings.Join(requires, ""), ID_ZERO[ID_TYPE],
-		ID_BYTESIZE[ID_TYPE]("this.ID"), ID_BYTESIZE[ID_TYPE]("this.Key"),
-		ID_WRITE[ID_TYPE]("protobuf", "this.ID"), ID_WRITE[ID_TYPE]("protobuf", "this.Key"),
-		ID_READ[ID_TYPE]("protobuf"), ID_READ[ID_TYPE]("protobuf"), ID_READ[ID_TYPE]("protobuf"),
+%s`, strings.Join(requires, ""), JSID_ZERO[ident],
+		JSID_BYTESIZE[ident]("this.ID"), JSID_BYTESIZE[ident]("this.Key"),
+		JSID_WRITE[ident]("protobuf", "this.ID"), JSID_WRITE[ident]("protobuf", "this.Key"),
+		JSID_READ[ident]("protobuf"), JSID_READ[ident]("protobuf"), JSID_READ[ident]("protobuf"),
 		strings.Join(methods, ""))))
 
 	ioutil.WriteFile(path.Join(dir, "rpc.js"), buffer.Bytes(), 0666)

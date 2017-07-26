@@ -27,6 +27,10 @@ func (s STRID) Ge(o ruid.ID) bool {
 	return s >= o.(STRID)
 }
 
+func (s STRID) Nonzero() bool {
+	return s != ZERO
+}
+
 func (s STRID) String() string {
 	return string(s)
 }
@@ -52,6 +56,10 @@ var STRIdent STRIdentity = 0
 
 func (_ STRIdentity) New() ruid.ID {
 	return STRID(ruid.New().String())
+}
+
+func (_ STRIdentity) Zero() ruid.ID {
+	return ZERO
 }
 
 func (_ STRIdentity) Deserialize(input *tygo.ProtoBuf) (s ruid.ID, err error) {

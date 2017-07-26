@@ -9,21 +9,21 @@ import (
 	"strings"
 	"sync"
 
-	id "github.com/ibelie/ruid"
+	"github.com/ibelie/ruid"
 )
 
 type HubImpl struct {
 	mutex     sync.Mutex
-	observers map[id.ID]map[string]map[id.ID]bool
+	observers map[ruid.ID]map[string]map[ruid.ID]bool
 }
 
-var HubInst = HubImpl{observers: make(map[id.ID]map[string]map[id.ID]bool)}
+var HubInst = HubImpl{observers: make(map[ruid.ID]map[string]map[ruid.ID]bool)}
 
 func HubService(_ Server, _ map[string]uint64) (uint64, Service) {
 	return SYMBOL_HUB, &HubInst
 }
 
-func (s *HubImpl) Procedure(i id.ID, method uint64, param []byte) (result []byte, err error) {
+func (s *HubImpl) Procedure(i ruid.ID, method uint64, param []byte) (result []byte, err error) {
 	switch method {
 	case SYMBOL_OBSERVE:
 		if session, gate, e := DeserializeSessionGate(param); e != nil {
@@ -32,10 +32,10 @@ func (s *HubImpl) Procedure(i id.ID, method uint64, param []byte) (result []byte
 			s.mutex.Lock()
 			defer s.mutex.Unlock()
 			if _, ok := s.observers[i]; !ok {
-				s.observers[i] = make(map[string]map[id.ID]bool)
+				s.observers[i] = make(map[string]map[ruid.ID]bool)
 			}
 			if _, ok := s.observers[i][gate]; !ok {
-				s.observers[i][gate] = make(map[id.ID]bool)
+				s.observers[i][gate] = make(map[ruid.ID]bool)
 			}
 			s.observers[i][gate][session] = true
 		}

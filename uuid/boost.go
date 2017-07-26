@@ -30,6 +30,10 @@ func (u ID) Ge(o ruid.ID) bool {
 	return bytes.Compare(u[:], i[:]) >= 0
 }
 
+func (u ID) Nonzero() bool {
+	return u != ZERO
+}
+
 func (u ID) String() string {
 	return base64.RawURLEncoding.EncodeToString(u[:])
 }
@@ -53,6 +57,10 @@ var UUIdent UUIdentity = 0
 
 func (_ UUIdentity) New() ruid.ID {
 	return ID(NewV1())
+}
+
+func (_ UUIdentity) Zero() ruid.ID {
+	return ZERO
 }
 
 func (_ UUIdentity) Deserialize(input *tygo.ProtoBuf) (ruid.ID, error) {

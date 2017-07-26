@@ -17,7 +17,7 @@ import (
 	"github.com/ibelie/tygo"
 )
 
-func Typescript(input string, tsOut string) (entities []*Entity) {
+func Typescript(identName string, input string, tsOut string) (entities []*Entity) {
 	pkg := typescript.Extract(input)
 	components := make(map[string]*Component)
 	for _, o := range pkg.Objects {
@@ -58,7 +58,7 @@ func Typescript(input string, tsOut string) (entities []*Entity) {
 	}
 
 	tygo.Typescript(tsOut, "types", "ibelie.rpc", types, PROP_PRE)
-	injectJavascript(tsOut, entities)
+	injectJavascript(identName, tsOut, entities)
 	injectTypescript(tsOut, entities, objects)
 	return entities
 }

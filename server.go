@@ -10,9 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ibelie/ruid"
 	"github.com/ibelie/tygo"
-
-	id "github.com/ibelie/ruid"
 )
 
 const (
@@ -57,20 +56,21 @@ type Node struct {
 type _Server struct {
 	Node
 	Network
+	ruid.Ident
 	mutex   sync.Mutex
 	routes  map[uint64]map[uint64]bool
 	symbols map[string]uint64
 	symdict map[uint64]string
 	nodes   map[string]*Node
 	conns   map[string]*sync.Pool
-	remote  map[uint64]*id.Ring
+	remote  map[uint64]*ruid.Ring
 	local   map[uint64]Service
 }
 
 var server *_Server
 
 type Service interface {
-	Procedure(id.ID, uint64, []byte) ([]byte, error)
+	Procedure(ruid.ID, uint64, []byte) ([]byte, error)
 }
 
 type Register func(Server, map[string]uint64) (uint64, Service)
@@ -82,23 +82,26 @@ type Server interface {
 	Remove(string)
 	Address() string
 	Register(...*Node)
-	Notify(id.ID, id.ID, []byte) error
-	Distribute(id.ID, id.ID, uint64, uint64, []byte) ([][]byte, error)
-	Procedure(id.ID, id.ID, uint64, uint64, []byte) ([]byte, error)
-	Request(string, id.ID, uint64, []byte, ...uint64) ([][]byte, error)
+	ZeroID() ruid.ID
+	DeserializeID(*tygo.ProtoBuf) (ruid.ID, error)
+	Notify(ruid.ID, ruid.ID, []byte) error
+	Distribute(ruid.ID, ruid.ID, uint64, uint64, []byte) ([][]byte, error)
+	Procedure(ruid.ID, ruid.ID, uint64, uint64, []byte) ([]byte, error)
+	Request(string, ruid.ID, uint64, []byte, ...uint64) ([][]byte, error)
 }
 
 func NewServer(address string, symbols map[string]uint64, routes map[uint64]map[uint64]bool,
-	network Network, rs ...Register) Server {
+	ident ruid.Ident, network Network, rs ...Register) Server {
 	server = &_Server{
 		Node:    Node{Addr: address},
+		Ident:   ident,
 		Network: network,
 		routes:  routes,
 		symbols: symbols,
 		symdict: make(map[uint64]string),
 		nodes:   make(map[string]*Node),
 		conns:   make(map[string]*sync.Pool),
-		remote:  make(map[uint64]*id.Ring),
+		remote:  make(map[uint64]*ruid.Ring),
 		local:   make(map[uint64]Service),
 	}
 
@@ -109,18 +112,30 @@ func NewServer(address string, symbols map[string]uint64, routes map[uint64]map[
 	for _, r := range rs {
 		i, c := r(server, symbols)
 		server.Srvs = append(server.Srvs, i)
-		server.remote[i] = id.NewRing(address)
+		server.remote[i] = ruid.NewRing(ident, address)
 		server.local[i] = c
 	}
 	return server
 }
 
-func (s *_Server) Notify(i id.ID, k id.ID, p []byte) (err error) {
+func (s *_Server) ZeroID() ruid.ID {
+	return s.Ident.Zero()
+}
+
+func (s *_Server) DeserializeID(input *tygo.ProtoBuf) (ruid.ID, error) {
+	return s.Ident.Deserialize(input)
+}
+
+func (s *_Server) Notify(i ruid.ID, k ruid.ID, p []byte) (err error) {
 	_, err = s.Procedure(i, k, SYMBOL_HUB, SYMBOL_NOTIFY, p)
 	return
 }
 
-func (s *_Server) Distribute(i id.ID, k id.ID, t uint64, m uint64, p []byte) (rs [][]byte, err error) {
+func (s *_Server) Distribute(i ruid.ID, k ruid.ID, t uint64, m uint64, p []byte) (rs [][]byte, err error) {
+	if !k.Nonzero() {
+		k = i
+	}
+
 	var errors []string
 	var components []uint64
 
@@ -171,8 +186,8 @@ func (s *_Server) Distribute(i id.ID, k id.ID, t uint64, m uint64, p []byte) (rs
 	return
 }
 
-func (s *_Server) Procedure(i id.ID, k id.ID, c uint64, m uint64, p []byte) (r []byte, err error) {
-	if k == id.ZERO {
+func (s *_Server) Procedure(i ruid.ID, k ruid.ID, c uint64, m uint64, p []byte) (r []byte, err error) {
+	if !k.Nonzero() {
 		k = i
 	}
 
@@ -188,7 +203,7 @@ func (s *_Server) Procedure(i id.ID, k id.ID, c uint64, m uint64, p []byte) (r [
 	return
 }
 
-func (s *_Server) Request(node string, i id.ID, m uint64, p []byte, cs ...uint64) (rs [][]byte, err error) {
+func (s *_Server) Request(node string, i ruid.ID, m uint64, p []byte, cs ...uint64) (rs [][]byte, err error) {
 	var errors []string
 	if node == s.Addr {
 		for _, c := range cs {
@@ -299,7 +314,7 @@ func (s *_Server) Register(nodes ...*Node) {
 			if ring, ok := s.remote[service]; ok {
 				ring.Append(node.Addr)
 			} else {
-				s.remote[service] = id.NewRing(node.Addr)
+				s.remote[service] = ruid.NewRing(s.Ident, node.Addr)
 			}
 		}
 		s.nodes[node.Addr] = node
@@ -313,7 +328,7 @@ func (s *_Server) Add(key string, node *Node) {
 		if ring, ok := s.remote[service]; ok {
 			ring.Append(node.Addr)
 		} else {
-			s.remote[service] = id.NewRing(node.Addr)
+			s.remote[service] = ruid.NewRing(s.Ident, node.Addr)
 		}
 	}
 	s.nodes[key] = node
@@ -330,7 +345,7 @@ func (s *_Server) Remove(key string) {
 	delete(s.nodes, key)
 }
 
-func SerializeRequest(i id.ID, ss []uint64, m uint64, p []byte) (data []byte) {
+func SerializeRequest(i ruid.ID, ss []uint64, m uint64, p []byte) (data []byte) {
 	var size int
 	for _, s := range ss {
 		size += tygo.SizeVarint(s)
@@ -347,9 +362,9 @@ func SerializeRequest(i id.ID, ss []uint64, m uint64, p []byte) (data []byte) {
 	return
 }
 
-func DeserializeRequest(data []byte) (i id.ID, ss []uint64, m uint64, p []byte, err error) {
+func DeserializeRequest(data []byte) (i ruid.ID, ss []uint64, m uint64, p []byte, err error) {
 	input := &tygo.ProtoBuf{Buffer: data}
-	if err = i.Deserialize(input); err != nil {
+	if i, err = server.DeserializeID(input); err != nil {
 	} else if m, err = input.ReadVarint(); err != nil {
 	} else if p, err = input.ReadBuf(); err != nil {
 	} else {
