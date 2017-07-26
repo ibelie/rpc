@@ -16,6 +16,10 @@ type ID UUID
 
 var ZERO = ID{}
 
+func New() ID {
+	return ID(NewV1())
+}
+
 func (u ID) Hash() ruid.ID {
 	return ID(md5.Sum(u[:]))
 }

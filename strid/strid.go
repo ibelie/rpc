@@ -14,6 +14,10 @@ type STRID string
 
 const ZERO STRID = ""
 
+func New() STRID {
+	return STRID(ruid.New().String())
+}
+
 func (s STRID) Hash() ruid.ID {
 	hash := md5.Sum([]byte(s))
 	return STRID(hash[:])
