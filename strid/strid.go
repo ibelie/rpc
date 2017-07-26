@@ -5,62 +5,62 @@
 package strid
 
 import (
+	"crypto/md5"
+	"github.com/ibelie/ruid"
 	"github.com/ibelie/tygo"
-	"math/rand"
-	"time"
 )
 
-type ID string
+type STRID string
 
-const (
-	ZERO ID = ""
-	SIZE    = 10
-)
+const ZERO STRID = ""
 
-const (
-	letterBytes   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	letterIdxBits = 6                    // 6 bits to represent a letter index
-	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
-	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
-)
-
-var src = rand.NewSource(time.Now().UnixNano())
-
-func New() ID {
-	b := make([]byte, SIZE)
-	for i, cache, remain := SIZE-1, src.Int63(), letterIdxMax; i >= 0; {
-		if remain == 0 {
-			cache, remain = src.Int63(), letterIdxMax
-		}
-		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
-			b[i] = letterBytes[idx]
-			i--
-		}
-		cache >>= letterIdxBits
-		remain--
-	}
-
-	return ID(b)
+func (s STRID) Hash() ruid.ID {
+	hash := md5.Sum([]byte(s))
+	return STRID(hash[:])
 }
 
-func (s ID) String() string {
+func (s STRID) Lt(o ruid.ID) bool {
+	return s < o.(STRID)
+}
+
+func (s STRID) Ge(o ruid.ID) bool {
+	return s >= o.(STRID)
+}
+
+func (s STRID) String() string {
 	return string(s)
 }
 
-func (s ID) ByteSize() (size int) {
+func (s STRID) ByteSize() (size int) {
 	l := len([]byte(s))
 	return tygo.SizeVarint(uint64(l)) + l
 }
 
-func (s ID) Serialize(output *tygo.ProtoBuf) {
+func (s STRID) Serialize(output *tygo.ProtoBuf) {
 	output.WriteBuf([]byte(s))
 }
 
-func (s *ID) Deserialize(input *tygo.ProtoBuf) (err error) {
-	if x, e := input.ReadBuf(); e == nil {
-		*s = ID(x)
-	} else {
-		err = e
-	}
+func (s *STRID) Deserialize(input *tygo.ProtoBuf) (err error) {
+	x, err := input.ReadBuf()
+	*s = STRID(x)
+	return
+}
+
+type STRIdentity int
+
+var STRIdent STRIdentity = 0
+
+func (_ STRIdentity) New() ruid.ID {
+	return STRID(ruid.New().String())
+}
+
+func (_ STRIdentity) Deserialize(input *tygo.ProtoBuf) (s ruid.ID, err error) {
+	x, err := input.ReadBuf()
+	s = STRID(x)
+	return
+}
+
+func (_ STRIdentity) GetIDs(bytes []byte) (ids []ruid.ID) {
+	ids = append(ids, STRID(bytes))
 	return
 }

@@ -6,17 +6,16 @@ package strid
 
 import (
 	"fmt"
-	"math/rand"
+	"github.com/ibelie/ruid"
 	"sort"
 	"testing"
 )
 
-func randomRing(ring *Ring, n int) {
+func randomRing(ring *ruid.Ring, n int) {
 	count := make(map[string]int)
 	for i := 0; i < n; i++ {
-		buf := make([]byte, rand.Int()%10+10)
-		rand.Read(buf)
-		node, _ := ring.Get(ID(buf))
+		id := STRIdent.New()
+		node, _ := ring.Get(id)
 		if _, exist := count[node]; !exist {
 			count[node] = 0
 		}
@@ -40,6 +39,6 @@ func TestRing(t *testing.T) {
 		nodes = append(nodes, node)
 		weights[node] = i
 	}
-	randomRing(WeightedRing(weights), 100000)
-	randomRing(NewRing(nodes...), 10000)
+	randomRing(ruid.WeightedRing(STRIdent, weights), 100000)
+	randomRing(ruid.NewRing(STRIdent, nodes...), 10000)
 }
