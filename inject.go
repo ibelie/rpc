@@ -286,7 +286,7 @@ func injectProcedureCaller(owner string, service string, method *tygo.Method, lo
 		%s = local.%s(%s)`, strings.Join(results_list, ", "), method.Name, strings.Join(params_list, ", "))
 		result_remote = fmt.Sprintf(`
 	var result []byte
-	if result, err = Server.Procedure(s.ID, s.Key, SYMBOL_%s, SYMBOL_%s, %s); err != nil {
+	if result, err = Server.Procedure(s.ID, s.Key, s.Type, SYMBOL_%s, SYMBOL_%s, %s); err != nil {
 		return
 	}
 	%s, err = s.Deserialize%sResult(result)`, service, method.Name, param,
@@ -295,7 +295,7 @@ func injectProcedureCaller(owner string, service string, method *tygo.Method, lo
 		result_local = fmt.Sprintf(`
 		local.%s(%s)`, method.Name, strings.Join(params_list, ", "))
 		result_remote = fmt.Sprintf(`
-	_, err = Server.Procedure(s.ID, s.Key, SYMBOL_%s, SYMBOL_%s, %s)`,
+	_, err = Server.Procedure(s.ID, s.Key, s.Type, SYMBOL_%s, SYMBOL_%s, %s)`,
 			service, method.Name, param)
 	}
 
@@ -336,7 +336,7 @@ func (s *%s) append%s(x ...%s) error {
 	}
 	s.%s = append(s.%s, x...)
 	e := s.Entity
-	return Server.Notify(e.ID, e.Key, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
+	return Server.Notify(e.ID, e.Key, e.Type, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
 }
 `, service.Name, strings.Title(property.Name), element_s, property.Name, property.Name,
 				property.Name, service.Name, property.Name))
@@ -354,7 +354,7 @@ func (s *%s) update%s(x %s) error {
 		s.%s[k] = v
 	}
 	e := s.Entity
-	return Server.Notify(e.ID, e.Key, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
+	return Server.Notify(e.ID, e.Key, e.Type, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
 }
 `, service.Name, strings.Title(property.Name), property_s, property.Name, property.Name,
 				property_s, property.Name, property.Name, service.Name, property.Name))
@@ -365,7 +365,7 @@ func (s *%s) update%s(x %s) error {
 func (s *%s) set%s(x %s) error {
 	s.%s = x
 	e := s.Entity
-	return Server.Notify(e.ID, e.Key, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
+	return Server.Notify(e.ID, e.Key, e.Type, s.Serialize%s(SYMBOL_%s, SYMBOL_%s, x))
 }
 `, service.Name, strings.Title(property.Name), property_s, property.Name, property.Name,
 				service.Name, property.Name))

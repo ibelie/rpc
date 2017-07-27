@@ -85,9 +85,9 @@ type Server interface {
 	ZeroID() ruid.ID
 	ServerID() ruid.ID
 	DeserializeID(*tygo.ProtoBuf) (ruid.ID, error)
-	Notify(ruid.ID, ruid.ID, []byte) error
+	Notify(ruid.ID, ruid.ID, uint64, []byte) error
 	Distribute(ruid.ID, ruid.ID, uint64, uint64, []byte) ([][]byte, error)
-	Procedure(ruid.ID, ruid.ID, uint64, uint64, []byte) ([]byte, error)
+	Procedure(ruid.ID, ruid.ID, uint64, uint64, uint64, []byte) ([]byte, error)
 	Request(string, ruid.ID, uint64, []byte, ...uint64) ([][]byte, error)
 }
 
@@ -131,14 +131,18 @@ func (s *_Server) DeserializeID(input *tygo.ProtoBuf) (ruid.ID, error) {
 	return s.Ident.Deserialize(input)
 }
 
-func (s *_Server) Notify(i ruid.ID, k ruid.ID, p []byte) (err error) {
-	_, err = s.Procedure(i, k, SYMBOL_HUB, SYMBOL_NOTIFY, p)
+func (s *_Server) Notify(i ruid.ID, k ruid.ID, t uint64, p []byte) (err error) {
+	_, err = s.Procedure(i, k, t, SYMBOL_HUB, SYMBOL_NOTIFY, p)
 	return
 }
 
 func (s *_Server) Distribute(i ruid.ID, k ruid.ID, t uint64, m uint64, p []byte) (rs [][]byte, err error) {
 	if !k.Nonzero() {
 		k = i
+	}
+	clientDelegate := SYMBOL_HUB
+	if t == SYMBOL_SESSION {
+		clientDelegate = SYMBOL_GATE
 	}
 
 	var errors []string
@@ -162,7 +166,7 @@ func (s *_Server) Distribute(i ruid.ID, k ruid.ID, t uint64, m uint64, p []byte)
 			}
 		}
 		if ok, exist := cs[t]; ok && exist {
-			components = append(components, SYMBOL_HUB)
+			components = append(components, clientDelegate)
 		}
 	}
 
@@ -172,8 +176,10 @@ func (s *_Server) Distribute(i ruid.ID, k ruid.ID, t uint64, m uint64, p []byte)
 			errors = append(errors, fmt.Sprintf("\n>>>> Unknown service type: %s(%v)", s.symdict[c], c))
 		} else if node, ok := ring.Get(k); !ok {
 			errors = append(errors, fmt.Sprintf("\n>>>> No service found: %s(%v) %v %v", s.symdict[c], c, s.Node, s.nodes))
-		} else {
+		} else if c != SYMBOL_GATE {
 			services[node] = append(services[node], c)
+		} else if _, err = s.Request(node, i, m, SerializeDispatch(map[ruid.ID]bool{i: true}, p), c); err != nil {
+			errors = append(errors, fmt.Sprintf("\n>>>> Dispatch session gate: %v\n>>>> %v", node, err))
 		}
 	}
 
@@ -191,9 +197,13 @@ func (s *_Server) Distribute(i ruid.ID, k ruid.ID, t uint64, m uint64, p []byte)
 	return
 }
 
-func (s *_Server) Procedure(i ruid.ID, k ruid.ID, c uint64, m uint64, p []byte) (r []byte, err error) {
+func (s *_Server) Procedure(i ruid.ID, k ruid.ID, t uint64, c uint64, m uint64, p []byte) (r []byte, err error) {
 	if !k.Nonzero() {
 		k = i
+	}
+	if t == SYMBOL_SESSION && c == SYMBOL_HUB {
+		c = SYMBOL_GATE
+		p = SerializeDispatch(map[ruid.ID]bool{i: true}, p)
 	}
 
 	if ring, ok := s.remote[c]; !ok {

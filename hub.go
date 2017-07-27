@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/ibelie/ruid"
+	"github.com/ibelie/tygo"
 )
 
 type HubImpl struct {
@@ -76,6 +77,16 @@ func (s *HubImpl) Procedure(i ruid.ID, method uint64, param []byte) (result []by
 		if len(errors) > 0 {
 			err = fmt.Errorf("[Hub] Dispatch errors %v %s(%v):%s", i, server.symdict[method], method, strings.Join(errors, ""))
 		}
+	}
+	return
+}
+
+func DeserializeSessionGate(data []byte) (session ruid.ID, gate string, err error) {
+	if session, err = server.DeserializeID(&tygo.ProtoBuf{Buffer: data}); err != nil {
+	} else if ring, ok := server.remote[SYMBOL_GATE]; !ok {
+		err = fmt.Errorf("Cannot find gate service: %v %v %v", server.remote, server.Node, server.nodes)
+	} else if gate, ok = ring.Get(session); !ok {
+		err = fmt.Errorf("No gate found: %v %v", server.Node, server.nodes)
 	}
 	return
 }
