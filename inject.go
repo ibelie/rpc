@@ -155,10 +155,12 @@ func injectProcedureCallee(service *tygo.Object, method *tygo.Method) (string, m
 }
 
 func injectServiceLocal(service *tygo.Object, object *doc.Type) (string, string, map[string]string) {
+	needService := false
 	var onCreate string
 	if hasMethod(object, &tygo.Method{Name: "onCreate"}) {
 		onCreate = `
 			s.services[i].onCreate()`
+		needService = true
 	}
 
 	serviceTemp := "_"
@@ -167,11 +169,11 @@ func injectServiceLocal(service *tygo.Object, object *doc.Type) (string, string,
 		serviceTemp = "service"
 		onDestroy = `
 			service.onDestroy()`
+		needService = true
 	}
 
 	var cases []string
 	var pkgs map[string]string
-	pkgs = update(pkgs, LOCAL_PKG)
 	for _, m := range service.Methods {
 		if !hasMethod(object, m) {
 			continue
@@ -179,7 +181,12 @@ func injectServiceLocal(service *tygo.Object, object *doc.Type) (string, string,
 		case_s, case_p := injectProcedureCallee(service, m)
 		cases = append(cases, case_s)
 		pkgs = update(pkgs, case_p)
+		needService = true
 	}
+	if !needService {
+		return "", "", nil
+	}
+	pkgs = update(pkgs, LOCAL_PKG)
 
 	return fmt.Sprintf("%sInst.services", service.Name), fmt.Sprintf(`
 type %sServiceImpl struct {
