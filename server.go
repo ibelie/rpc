@@ -86,6 +86,7 @@ type Server interface {
 	ServerID() ruid.ID
 	DeserializeID(*tygo.ProtoBuf) (ruid.ID, error)
 	Notify(ruid.ID, ruid.ID, uint64, []byte) error
+	Message(ruid.ID, ruid.ID, ruid.ID, uint64, []byte) ([]byte, error)
 	Distribute(ruid.ID, ruid.ID, uint64, uint64, []byte) ([][]byte, error)
 	Procedure(ruid.ID, ruid.ID, uint64, uint64, uint64, []byte) ([]byte, error)
 	Request(string, ruid.ID, uint64, []byte, ...uint64) ([][]byte, error)
@@ -193,6 +194,19 @@ func (s *_Server) Distribute(i ruid.ID, k ruid.ID, t uint64, m uint64, p []byte)
 
 	if len(errors) > 0 {
 		err = fmt.Errorf("[Distribute] %s(%v:%v) %s(%v) errors:%s", s.symdict[t], i, k, s.symdict[m], m, strings.Join(errors, ""))
+	}
+	return
+}
+
+func (s *_Server) Message(i ruid.ID, k ruid.ID, t ruid.ID, m uint64, p []byte) (r []byte, err error) {
+	if ring, ok := s.remote[SYMBOL_GATE]; !ok {
+		err = fmt.Errorf("[Message] Cannot find gate service: %v %v %v", s.remote, s.Node, s.nodes)
+	} else if node, ok := ring.Get(k); !ok {
+		err = fmt.Errorf("[Message] No gate found: %v %v", s.Node, s.nodes)
+	} else if rs, e := s.Request(node, t, m, SerializeDispatch(map[ruid.ID]bool{i: true}, p), SYMBOL_GATE); e != nil || len(rs) <= 0 {
+		err = e
+	} else {
+		r = rs[0]
 	}
 	return
 }

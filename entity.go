@@ -66,8 +66,17 @@ type Entity struct {
 	Type uint64
 }
 
+type ClientDelegate struct {
+	e *Entity
+	s *Entity
+}
+
 func NewEntity(i ruid.ID, k ruid.ID, t string) *Entity {
 	return &Entity{ID: i, Key: k, Type: Symbols[t]}
+}
+
+func (e *Entity) Client(session *Entity) *ClientDelegate {
+	return &ClientDelegate{e: e, s: session}
 }
 
 func (e *Entity) Create() (err error) {
@@ -470,15 +479,17 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 		param = "nil"
 	}
 
-	var result string
-	var result_declare string
+	var dist_result string
+	var dist_declare string
+	var proc_result string
+	var proc_declare string
 	if len(method.Results) == 1 {
 		result_s, result_p := method.Results[0].Go()
 		pkgs = update(pkgs, result_p)
 		pkgs = update(pkgs, FMT_PKG)
 		pkgs = update(pkgs, STR_PKG)
-		result_declare = fmt.Sprintf("rs []%s, ", result_s)
-		result = fmt.Sprintf(`
+		dist_declare = fmt.Sprintf("rs []%s, ", result_s)
+		dist_result = fmt.Sprintf(`
 	if results, er := Server.Distribute(e.ID, e.Key, e.Type, SYMBOL_%s, %s); er != nil {
 		err = er
 	} else {
@@ -494,9 +505,18 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 			err = fmt.Errorf("[%s] %s errors:%%s", strings.Join(errors, ""))
 		}
 	}`, method.Name, param, service.Name, method.Name, service.Name, method.Name)
+		proc_declare = fmt.Sprintf("r %s, ", result_s)
+		proc_result = fmt.Sprintf(`
+	result, err := Server.Message(c.s.ID, c.s.Key, c.e.ID, SYMBOL_%s, %s)
+	if err == nil {
+		r, err = (*%sDelegate)(nil).Deserialize%sResult(result)
+	}`, method.Name, param, service.Name, method.Name)
 	} else {
-		result = fmt.Sprintf(`
+		dist_result = fmt.Sprintf(`
 	_, err = Server.Distribute(e.ID, e.Key, e.Type, SYMBOL_%s, %s)`,
+			method.Name, param)
+		proc_result = fmt.Sprintf(`
+	_, err = Server.Message(c.s.ID, c.s.Key, c.e.ID, SYMBOL_%s, %s)`,
 			method.Name, param)
 	}
 
@@ -504,5 +524,10 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 func (e *Entity) %s(%s) (%serr error) {%s
 	return
 }
-`, method.Name, strings.Join(params_declare, ", "), result_declare, result), pkgs
+
+func (c *ClientDelegate) %s(%s) (%serr error) {%s
+	return
+}
+`, method.Name, strings.Join(params_declare, ", "), dist_declare, dist_result,
+		method.Name, strings.Join(params_declare, ", "), proc_declare, proc_result), pkgs
 }
