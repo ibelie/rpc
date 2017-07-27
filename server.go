@@ -83,6 +83,7 @@ type Server interface {
 	Address() string
 	Register(...*Node)
 	ZeroID() ruid.ID
+	ServerID() ruid.ID
 	DeserializeID(*tygo.ProtoBuf) (ruid.ID, error)
 	Notify(ruid.ID, ruid.ID, []byte) error
 	Distribute(ruid.ID, ruid.ID, uint64, uint64, []byte) ([][]byte, error)
@@ -120,6 +121,10 @@ func NewServer(address string, symbols map[string]uint64, routes map[uint64]map[
 
 func (s *_Server) ZeroID() ruid.ID {
 	return s.Ident.Zero()
+}
+
+func (s *_Server) ServerID() ruid.ID {
+	return ruid.RingKey(s.Ident, s.Addr)
 }
 
 func (s *_Server) DeserializeID(input *tygo.ProtoBuf) (ruid.ID, error) {

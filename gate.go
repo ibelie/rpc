@@ -69,10 +69,8 @@ func (s *GateImpl) ignore(i ruid.ID, k ruid.ID, session ruid.ID) (err error) {
 
 func (s *GateImpl) handler(gate Connection) {
 	session := server.Ident.New()
-	if _, err := server.Distribute(session, server.Ident.Zero(), SYMBOL_SESSION, SYMBOL_CREATE, OBSERVE_SESSION); err != nil {
+	if _, err := server.Distribute(session, server.ServerID(), SYMBOL_SESSION, SYMBOL_CREATE, OBSERVE_SESSION); err != nil {
 		log.Printf("[Gate@%v] Create session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
-	} else if components, err := s.observe(session, server.Ident.Zero(), SYMBOL_SESSION, session); err != nil {
-		log.Printf("[Gate@%v] Observe session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 	} else if err := gate.Send(SerializeHandshake(session, components)); err != nil {
 		log.Printf("[Gate@%v] Send session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 	}
@@ -132,9 +130,7 @@ func (s *GateImpl) handler(gate Connection) {
 	GateInst.mutex.Lock()
 	delete(s.gates, session)
 	GateInst.mutex.Unlock()
-	if err := s.ignore(session, server.Ident.Zero(), session); err != nil {
-		log.Printf("[Gate@%v] Ignore session error %v:\n>>>> %v", server.Addr, session, err)
-	} else if _, err := server.Distribute(session, server.Ident.Zero(), SYMBOL_SESSION, SYMBOL_DESTROY, nil); err != nil {
+	if _, err := server.Distribute(session, server.ServerID(), SYMBOL_SESSION, SYMBOL_DESTROY, nil); err != nil {
 		log.Printf("[Gate@%v] Destroy session error %v:\n>>>> %v", server.Addr, session, err)
 	}
 }
