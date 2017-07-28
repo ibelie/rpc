@@ -265,7 +265,7 @@ func proxySymbols(entities []*Entity) string {
 				continue
 			}
 			symbolMap[c.Name] = true
-			for _, f := range c.Protocol.Fields {
+			for _, f := range c.Protocol.VisibleFields() {
 				symbolMap[f.Name] = true
 			}
 			for _, m := range c.Protocol.Methods {
@@ -401,7 +401,7 @@ func entityInitialize(services []*tygo.Object) (string, map[string]string) {
 	symbolMap := make(map[string]bool)
 	for _, s := range services {
 		symbolMap[s.Name] = true
-		for _, f := range s.Fields {
+		for _, f := range s.VisibleFields() {
 			symbolMap[f.Name] = true
 		}
 		for _, m := range s.Methods {

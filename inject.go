@@ -331,7 +331,7 @@ func (s *%s) %s(%s) (%s) {%s%s
 func injectServiceProperty(service *tygo.Object) (string, map[string]string) {
 	var pkgs map[string]string
 	var codes []string
-	for _, property := range service.Fields {
+	for _, property := range service.VisibleFields() {
 		switch t := property.Type.(type) {
 		case *tygo.ListType:
 			element_s, element_p := t.E.Go()
