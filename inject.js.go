@@ -198,7 +198,7 @@ ibelie.rpc.Component.prototype.Awake = function(e) {
 	entity = new entities[ibelie.rpc.Dictionary[e.Type]]();
 	entity.ID = e.ID;
 	entity.Key = e.Key;
-	entity.Type	= e.Type;
+	entity.Type = e.Type;
 	entity.connection = conn;
 	conn.send(e, ibelie.rpc.Symbols.OBSERVE);
 	conn.entities[entity.ID] = entity;
@@ -224,7 +224,7 @@ ibelie.rpc.Component.prototype.Drop = function(e) {
 	var entity = new Entity();
 	entity.ID = e.ID;
 	entity.Key = e.Key;
-	entity.Type	= e.Type;
+	entity.Type = e.Type;
 	return entity;
 };
 
