@@ -14,7 +14,7 @@ import (
 	"os/exec"
 )
 
-var JS_PATH = path.Join(os.Getenv("GOPATH"), "src", reflect.TypeOf(PackageStr{}).PkgPath(), "extract.js")
+var PY_PATH = path.Join(os.Getenv("GOPATH"), "src", reflect.TypeOf(PackageStr{}).PkgPath(), "extract.py")
 
 type TypeStr struct {
 	Simple string
@@ -49,7 +49,8 @@ type PackageStr struct {
 }
 
 func Extract(file string) (pkg *PackageStr) {
-	output, err := exec.Command("node", JS_PATH, file).CombinedOutput()
+	output, err := exec.Command("python", PY_PATH, file).CombinedOutput()
+	log.Println(string(output))
 	if err != nil {
 		log.Fatalf("[Python] Cannot extract: %s\n>>>> %v", string(output))
 	} else if err = json.Unmarshal(output, &pkg); err != nil {
