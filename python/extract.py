@@ -16,13 +16,12 @@ def _compareWrite(path, content):
 
 def extract(path, proto_file, *ignore):
 	import os
-	import sys
 	import imp
 	import codecs
-	from microserver.classes import MetaEntity, Entity, MetaComponent, Component
+	from microserver import MetaEntity, Entity, MetaComponent, Component
 
 	path = path.replace('\\', '/').replace('//', '/')
-	if os.path.isfile(proto_file):
+	if os.path.isfile(proto_file) and False:
 		with codecs.open(proto_file, 'r', 'utf-8') as f:
 			proto = imp.new_module('microserver.proto')
 			proto.__package__ = 'microserver'
@@ -35,10 +34,13 @@ def extract(path, proto_file, *ignore):
 		proto = _Proto()
 		proto.timestamps = {}
 
+	def _componentName(c):
+		return '%s_%s' % (c.__module__.replace('.', '_'), c.__name__)
+
 	def _scanScripts(sub):
 		for i in os.listdir('%s/%s' % (path, sub)):
-			sys.stdout.write('.')
-			sys.stdout.flush()
+			# sys.stdout.write('.')
+			# sys.stdout.flush()
 			p = '%s/%s' % (sub, i) if sub else i
 			fp = '%s/%s' % (path, p)
 			if p in ignore or p[:-1] in ignore:
@@ -54,8 +56,8 @@ def extract(path, proto_file, *ignore):
 					continue
 				proto.timestamps[fp] = str(os.stat(fp).st_mtime)
 				m = n if not sub else '%s.%s' % (sub.replace('/', '.'), n)
-				print '\n[Microserver] Incremental proto:', m
 				__import__(m)
+				# print '\n[Microserver] Incremental proto:', m
 
 	if os.path.isfile(path) and path.endswith('.py'):
 		with codecs.open(path, 'r', 'utf-8') as f:
@@ -66,42 +68,36 @@ def extract(path, proto_file, *ignore):
 
 	for n, c in MetaEntity.Entities.iteritems():
 		setattr(proto, n, c)
-	for n, c in MetaComponent.Components.iteritems():
-		setattr(proto, n, c)
+	for c in MetaComponent.Components.itervalues():
+		setattr(proto, _componentName(c), c)
 
 	types = []
 	entities = {}
 	components = {}
-	virtualModules = set()
 	for n in dir(proto):
 		c = getattr(proto, n)
-		if isinstance(c, Component):
-			m = c.__module__.split('.')[0]
-			if m not in virtualModules:
-				types.append("""
-%s = microserver.VirtualModule()""" % m)
-				virtualModules.add(m)
+		if isinstance(c, type) and issubclass(c, Component):
 			types.append("""
-%s.%s = type('%s', (microserver.Component, ), {
+%s = type('%s', (microserver.Component, ), {
 	'____virtual__' = True,
 	'__module__' = '%s',%s
 }
-""" % (c.__module__, n, n, c.__module__, ''))
-			components[name] = {}
+""" % (n, c.__name__, c.__module__, ''))
+			components[n] = {}
 
 	for n in dir(proto):
 		c = getattr(proto, n)
-		if isinstance(c, Entity):
+		if isinstance(c, type) and issubclass(c, Entity):
 			types.append("""
 class %s(microserver.Entity):
 	____virtual__ = True%s
 """ % (n, ''.join(["""
-	%s = microserver.Component(%s.%s, '%s')""" % (k, v.klass.__module__, v.klass.__name__, v.path) for k, v in c.____components__.iteritems()])))
-			entities[n] = {'Components': {k: components[k] for k in c.____components__}}
+	%s = microserver.Component(%s, '%s')""" % (k, _componentName(v.klass), v.path) for k, v in c.____components__.iteritems()])))
+			entities[n] = {'Components': {k: components[_componentName(v.klass)] for k, v in c.____components__.iteritems()}}
 
 	_compareWrite(proto_file, MICROSERVER_PROTO__ % ('\n\t'.join(['\'%s\': \'%s\',' % (p, t) for p, t in sorted(proto.timestamps.iteritems())]), ''.join(types)))
 
-	print repr(entities)
+	print repr(entities).replace("'", '"')
 
 
 MICROSERVER_PROTO__ = ur"""#-*- coding: utf-8 -*-
