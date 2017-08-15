@@ -36,7 +36,6 @@ type PackageStr struct {
 func Extract(input string, pyOut string, ignore []string) (pkg *PackageStr) {
 	args := append([]string{PY_PATH, input, path.Join(pyOut, "microserver.proto")}, ignore...)
 	output, err := exec.Command("python", args...).CombinedOutput()
-	log.Println(string(output))
 	if err != nil {
 		log.Fatalf("[Python] Cannot extract: %s\n>>>> %v", string(output))
 	} else if err = json.Unmarshal(output, &pkg); err != nil {
