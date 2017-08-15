@@ -16,36 +16,21 @@ import (
 
 var PY_PATH = path.Join(os.Getenv("GOPATH"), "src", reflect.TypeOf(PackageStr{}).PkgPath(), "extract.py")
 
-type TypeStr struct {
-	Simple string
-	List   *TypeStr
-	Key    *TypeStr
-	Value  *TypeStr
+type ComponentStr struct {
+	Name       string
+	Package    string
+	Properties []string
+	Messages   []string
 }
 
-type FieldStr struct {
-	Name     string
-	Document string
-	Type     *TypeStr
-}
-
-type MethodStr struct {
-	Name     string
-	Document string
-	Result   *TypeStr
-	Params   []*TypeStr
-}
-
-type ObjectStr struct {
-	Name    string
-	Parents []*TypeStr
-	Fields  []*FieldStr
-	Methods []*MethodStr
+type EntityStr struct {
+	Name       string
+	Components []string
 }
 
 type PackageStr struct {
-	Files   []string
-	Objects []*ObjectStr
+	Entities   []*EntityStr
+	Components map[string]*ComponentStr
 }
 
 func Extract(input string, pyOut string, ignore []string) (pkg *PackageStr) {

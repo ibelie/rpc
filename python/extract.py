@@ -21,7 +21,7 @@ def extract(path, proto_file, *ignore):
 	from microserver import MetaEntity, Entity, MetaComponent, Component
 
 	path = path.replace('\\', '/').replace('//', '/')
-	if os.path.isfile(proto_file) and False:
+	if os.path.isfile(proto_file):
 		with codecs.open(proto_file, 'r', 'utf-8') as f:
 			proto = imp.new_module('microserver.proto')
 			proto.__package__ = 'microserver'
@@ -71,33 +71,43 @@ def extract(path, proto_file, *ignore):
 	for c in MetaComponent.Components.itervalues():
 		setattr(proto, _componentName(c), c)
 
-	types = []
-	entities = {}
-	components = {}
-	for n in dir(proto):
+	codes = []
+	types = {'Components': {}, 'Entities': []}
+	for n in sorted(dir(proto)):
 		c = getattr(proto, n)
 		if isinstance(c, type) and issubclass(c, Component):
-			types.append("""
-%s = type('%s', (microserver.Component, ), {
-	'____virtual__' = True,
-	'__module__' = '%s',%s
-}
-""" % (n, c.__name__, c.__module__, ''))
-			components[n] = {}
+			codes.append("""
+%s = type('%s', (microserver.Component, ), dict(
+	____virtual__ = True,
+	____package__ = '%s',
+	__module__ = '%s',%s
+))
+""" % (n, c.__name__, c.____package__, c.__module__, ''.join(["""
+	%s = microserver.Property(lambda self, *args: None),""" % a for a in sorted(c.____properties__)] + ["""
+	%s = microserver.Message(lambda self, *args: None),""" % a for a in sorted(c.____messages__)])))
+			types['Components'][n] = {
+				'Name': c.__name__,
+				'Package': c.____package__,
+				'Properties': c.____properties__.keys(),
+				'Messages': c.____messages__.keys(),
+			}
 
-	for n in dir(proto):
+	for n in sorted(dir(proto)):
 		c = getattr(proto, n)
 		if isinstance(c, type) and issubclass(c, Entity):
-			types.append("""
+			sortedComponents = sorted(c.____components__.iteritems(), key = lambda (k, v): k)
+			codes.append("""
 class %s(microserver.Entity):
 	____virtual__ = True%s
 """ % (n, ''.join(["""
-	%s = microserver.Component(%s, '%s')""" % (k, _componentName(v.klass), v.path) for k, v in c.____components__.iteritems()])))
-			entities[n] = {'Components': {k: components[_componentName(v.klass)] for k, v in c.____components__.iteritems()}}
+	%s = %s""" % (k, _componentName(v)) for k, v in sortedComponents])))
+			types['Entities'].append({'Name': n, 'Components': [_componentName(v)
+				for _, v in sortedComponents]})
 
-	_compareWrite(proto_file, MICROSERVER_PROTO__ % ('\n\t'.join(['\'%s\': \'%s\',' % (p, t) for p, t in sorted(proto.timestamps.iteritems())]), ''.join(types)))
+	_compareWrite(proto_file, MICROSERVER_PROTO__ % ('\n\t'.join(['\'%s\': \'%s\',' % (p, t)
+		for p, t in sorted(proto.timestamps.iteritems())]), ''.join(codes)))
 
-	print repr(entities).replace("'", '"')
+	print repr(types).replace("'", '"')
 
 
 MICROSERVER_PROTO__ = ur"""#-*- coding: utf-8 -*-
