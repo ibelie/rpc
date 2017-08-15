@@ -246,11 +246,12 @@ ibelie.rpc.Connection = function(url) {
 					ibelie.rpc.Symbols[symbol] = value;
 					ibelie.rpc.Dictionary[value] = symbol;
 				}
+				var key = %s;
 				var t = protobuf.ReadVarint();
 				entity = new entities[ibelie.rpc.Dictionary[t]]();
 				entity.connection = conn;
 				entity.ID = id;
-				entity.Key = ZERO_ID;
+				entity.Key = key;
 				entity.Type = t;
 				conn.entities[id] = entity;
 			} else {
@@ -337,7 +338,8 @@ ibelie.rpc.Connection.prototype.disconnect = function() {
 %s`, strings.Join(requires, ""), JSID_ZERO[ident],
 		JSID_BYTESIZE[ident]("this.ID"), JSID_BYTESIZE[ident]("this.Key"),
 		JSID_WRITE[ident]("protobuf", "this.ID"), JSID_WRITE[ident]("protobuf", "this.Key"),
-		JSID_READ[ident]("protobuf"), JSID_READ[ident]("protobuf"), JSID_READ[ident]("protobuf"),
+		JSID_READ[ident]("protobuf"), JSID_READ[ident]("protobuf"),
+		JSID_READ[ident]("protobuf"), JSID_READ[ident]("protobuf"),
 		strings.Join(methods, ""))))
 
 	ioutil.WriteFile(path.Join(dir, "rpc.js"), buffer.Bytes(), 0666)

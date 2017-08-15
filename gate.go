@@ -45,13 +45,15 @@ func Gate(address string, session string, network Network) {
 		symbol := []byte(name)
 		syms += tygo.SizeVarint(uint64(len(symbol))) + len(symbol) + tygo.SizeVarint(value)
 	}
-	HANDSHAKE_DATA = make([]byte, syms+tygo.SizeVarint(uint64(syms))+tygo.SizeVarint(SYMBOL_SESSION))
+	serverID := server.ServerID()
+	HANDSHAKE_DATA = make([]byte, syms+tygo.SizeVarint(uint64(syms))+serverID.ByteSize()+tygo.SizeVarint(SYMBOL_SESSION))
 	output = &tygo.ProtoBuf{Buffer: HANDSHAKE_DATA}
 	output.WriteVarint(uint64(syms))
 	for symbol, value := range server.symbols {
 		output.WriteBuf([]byte(symbol))
 		output.WriteVarint(value)
 	}
+	serverID.Serialize(output)
 	output.WriteVarint(SYMBOL_SESSION)
 
 	network.Serve(address, GateInst.handler)
