@@ -12,8 +12,8 @@ import (
 	"github.com/ibelie/tygo"
 )
 
-func Python(identName string, input string, tsOut string) (entities []*Entity) {
-	pkg := python.Extract(input)
+func Python(identName string, input string, pyOut string, ignore []string) (entities []*Entity) {
+	pkg := python.Extract(input, pyOut, ignore)
 	components := make(map[string]*Component)
 	for _, o := range pkg.Objects {
 		if len(o.Parents) != 1 || o.Parents[0] == nil || o.Parents[0].Simple != "ibelie.rpc.Component" {

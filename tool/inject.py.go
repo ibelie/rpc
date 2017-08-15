@@ -14,7 +14,8 @@ func main() {
 	input := flag.String("in", "", "input python sources root")
 	pyOut := flag.String("py", "", "output python dir")
 	goOut := flag.String("go", "", "output golang dir")
+	ignore := flag.String("ig", "", "ignore python modules")
 	flag.Parse()
-	entities := rpc.Python(*ident, *input, *pyOut)
+	entities := rpc.Python(*ident, *input, *pyOut, append(flag.Args(), *ignore))
 	rpc.Proxy(*ident, *goOut, entities)
 }

@@ -48,8 +48,9 @@ type PackageStr struct {
 	Objects []*ObjectStr
 }
 
-func Extract(file string) (pkg *PackageStr) {
-	output, err := exec.Command("python", PY_PATH, file).CombinedOutput()
+func Extract(input string, pyOut string, ignore []string) (pkg *PackageStr) {
+	args := append([]string{PY_PATH, input, path.Join(pyOut, "microserver.proto")}, ignore...)
+	output, err := exec.Command("python", args...).CombinedOutput()
 	log.Println(string(output))
 	if err != nil {
 		log.Fatalf("[Python] Cannot extract: %s\n>>>> %v", string(output))
