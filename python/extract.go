@@ -34,7 +34,7 @@ type PackageStr struct {
 }
 
 func Extract(input string, pyOut string, ignore []string) (pkg *PackageStr) {
-	args := append([]string{PY_PATH, input, path.Join(pyOut, "microserver.proto")}, ignore...)
+	args := append([]string{PY_PATH, input, path.Join(pyOut, "proto.cache")}, ignore...)
 	output, err := exec.Command("python", args...).CombinedOutput()
 	if err != nil {
 		log.Fatalf("[Python] Cannot extract: %s\n>>>> %v", string(output))
