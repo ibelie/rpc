@@ -7,7 +7,6 @@ package rpc
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"path"
 	"strings"
 
@@ -47,27 +46,17 @@ func Typescript(identName string, input string, tsOut string) (entities []*Entit
 	}
 
 	types := resolveEntities(entities)
-	objects := make(map[string]*tygo.Object)
-	for _, t := range types {
-		if object, ok := t.(*tygo.Object); ok {
-			if o, exist := objects[object.Name]; exist {
-				log.Fatalf("[RPC][Typescript] Object already exists: %v %v", o, object)
-			}
-			objects[object.Name] = object
-		}
-	}
-
 	tygo.Typescript(tsOut, "types", "ibelie.rpc", types, PROP_PRE)
 	injectJavascript(identName, tsOut, entities)
-	injectTypescript(tsOut, entities, objects)
+	injectTypescript(tsOut, entities, types)
 	return entities
 }
 
-func injectTypescript(dir string, entities []*Entity, objects map[string]*tygo.Object) {
+func injectTypescript(dir string, entities []*Entity, types []tygo.Type) {
 	var buffer bytes.Buffer
 	var methods []string
 	methodsMap := make(map[string]bool)
-	tygo.TS_OBJECTS = objects
+	tygo.TS_OBJECTS = tygo.ObjectMap(types)
 	for _, e := range entities {
 		for _, c := range e.Components {
 			if c.Protocol == nil {
