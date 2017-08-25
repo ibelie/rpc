@@ -37,8 +37,47 @@ func Python(identName string, input string, pyOut string, ignore []string) (enti
 	}
 
 	types := resolveEntities(entities)
-	tygo.Python(pyOut, "types", types, PROP_PRE)
-	tygo.Typyd(pyOut, "_typy", types, PROP_PRE)
+	var methods []tygo.Type
+	for _, t := range types {
+		if object, ok := t.(*tygo.Object); ok {
+			for _, field := range object.VisibleFields() {
+				methods = append(methods, &tygo.Object{
+					Name:   fmt.Sprintf("%s_%s", object.Name, field.Name),
+					Parent: &tygo.InstanceType{PkgName: "tygo", PkgPath: tygo.TYGO_PATH, Name: "Tygo"},
+					Fields: []*tygo.Field{field},
+				})
+			}
+
+			for _, method := range object.Methods {
+				if len(method.Params) > 0 {
+					var params []*tygo.Field
+					for i, p := range method.Params {
+						params = append(params, &tygo.Field{Type: p, Name: fmt.Sprintf("a%d", i)})
+					}
+					methods = append(methods, &tygo.Object{
+						Name:   fmt.Sprintf("%s_%sParam", object.Name, method.Name),
+						Parent: &tygo.InstanceType{PkgName: "tygo", PkgPath: tygo.TYGO_PATH, Name: "Tygo"},
+						Fields: params,
+					})
+				}
+				if len(method.Results) > 0 {
+					var results []*tygo.Field
+					for i, r := range method.Results {
+						results = append(results, &tygo.Field{Type: r, Name: fmt.Sprintf("a%d", i)})
+					}
+					methods = append(methods, &tygo.Object{
+						Name:   fmt.Sprintf("%s_%sResult", object.Name, method.Name),
+						Parent: &tygo.InstanceType{PkgName: "tygo", PkgPath: tygo.TYGO_PATH, Name: "Tygo"},
+						Fields: results,
+					})
+				}
+			}
+		}
+	}
+	types = append(types, methods...)
+
+	tygo.Python(pyOut, "types", types)
+	tygo.Typyd(pyOut, "_typy", types)
 	injectPython(pyOut, entities)
 	return entities
 }
