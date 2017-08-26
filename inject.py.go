@@ -83,6 +83,8 @@ func Python(identName string, input string, pyOut string, ignore []string) (enti
 	buffer.Write([]byte(PY_HEADER))
 	buffer.Write([]byte(fmt.Sprintf(`
 IDType = '%s'
+
+from microserver.classes import Entity
 `, identName)))
 	buffer.Write(tygo.Python(types))
 	ioutil.WriteFile(path.Join(pyOut, "proto.py"), buffer.Bytes(), 0666)
