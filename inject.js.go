@@ -97,7 +97,7 @@ Entity.prototype.%s = function(%s) {
 		v.%s && v.%s.call(%s);
 	}
 	var data = ibelie.rpc.%s.Serialize%sParam(%s);
-	this.connection.send(this, ibelie.rpc.Symbols.%s, data);
+	this.connection.send(this, this.connection.Symbols.%s, data);
 };
 `, m.Name, c.Name, m.Name, m.Name, strings.Join(params, ", "),
 					m.Name, m.Name, strings.Join(localParams, ", "),
@@ -195,12 +195,12 @@ ibelie.rpc.Component.prototype.Awake = function(e) {
 	if (entity) {
 		return entity
 	}
-	entity = new entities[ibelie.rpc.Dictionary[e.Type]]();
+	entity = new entities[conn.Dictionary[e.Type]]();
 	entity.ID = e.ID;
 	entity.Key = e.Key;
 	entity.Type = e.Type;
 	entity.connection = conn;
-	conn.send(e, ibelie.rpc.Symbols.OBSERVE);
+	conn.send(e, conn.Symbols.OBSERVE);
 	conn.entities[entity.ID] = entity;
 	return entity;
 };
@@ -219,7 +219,7 @@ ibelie.rpc.Component.prototype.Drop = function(e) {
 	}
 	e.isAwake = false;
 	var conn = this.Entity.connection;
-	conn.send(e, ibelie.rpc.Symbols.IGNORE);
+	conn.send(e, conn.Symbols.IGNORE);
 	delete conn.entities[e.ID];
 	var entity = new Entity();
 	entity.ID = e.ID;
@@ -236,19 +236,19 @@ ibelie.rpc.Connection = function(url) {
 			var entity;
 			var protobuf = tyts.ProtoBuf.FromBase64(event.data);
 			var id = %s;
-			if (!ibelie.rpc.Symbols) {
-				ibelie.rpc.Symbols = {};
-				ibelie.rpc.Dictionary = {};
+			if (!conn.Symbols) {
+				conn.Symbols = {};
+				conn.Dictionary = {};
 				var buffer = new tyts.ProtoBuf(protobuf.ReadBuffer());
 				while (!buffer.End()) {
 					var symbol = tyts.String.Deserialize(null, buffer);
 					var value = buffer.ReadVarint();
-					ibelie.rpc.Symbols[symbol] = value;
-					ibelie.rpc.Dictionary[value] = symbol;
+					conn.Symbols[symbol] = value;
+					conn.Dictionary[value] = symbol;
 				}
 				var key = %s;
 				var t = protobuf.ReadVarint();
-				entity = new entities[ibelie.rpc.Dictionary[t]]();
+				entity = new entities[conn.Dictionary[t]]();
 				entity.connection = conn;
 				entity.ID = id;
 				entity.Key = key;
@@ -262,7 +262,7 @@ ibelie.rpc.Connection = function(url) {
 				}
 			}
 			while (!protobuf.End()) {
-				var name = ibelie.rpc.Dictionary[protobuf.ReadVarint()];
+				var name = conn.Dictionary[protobuf.ReadVarint()];
 				var data = protobuf.ReadBuffer();
 				if (ibelie.rpc[name]) {
 					ibelie.rpc[name].prototype.Deserialize.call(entity[name], data);
@@ -271,8 +271,8 @@ ibelie.rpc.Connection = function(url) {
 					continue;
 				} else if (name == 'NOTIFY') {
 					var buffer = new tyts.ProtoBuf(data);
-					var compName = ibelie.rpc.Dictionary[buffer.ReadVarint()];
-					var property = ibelie.rpc.Dictionary[buffer.ReadVarint()];
+					var compName = conn.Dictionary[buffer.ReadVarint()];
+					var property = conn.Dictionary[buffer.ReadVarint()];
 					var newValue = ibelie.rpc[compName]['Deserialize' + property](buffer.Bytes())[0];
 					var component = entity[compName];
 					var oldValue = component[property];
