@@ -73,6 +73,8 @@ func (_ STRIdentity) Deserialize(input *tygo.ProtoBuf) (s ruid.ID, err error) {
 }
 
 func (_ STRIdentity) GetIDs(bytes []byte) (ids []ruid.ID) {
-	ids = append(ids, STRID(bytes))
+	for _, id := range ruid.RUIdent.GetIDs(bytes) {
+		ids = append(ids, STRID(id.String()))
+	}
 	return
 }
