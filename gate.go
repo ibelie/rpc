@@ -130,7 +130,7 @@ func (s *GateImpl) handler(gate Connection) {
 	delete(s.gates, session)
 	GateInst.mutex.Unlock()
 	if _, err := server.Distribute(session, server.ServerID(), SYMBOL_SESSION, SYMBOL_DESTROY, nil); err != nil {
-		log.Printf("[Gate@%v] Destroy session error %v:\n>>>> %v", server.Addr, session, err)
+		log.Printf("[Gate@%v] Destroy session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 	}
 }
 
