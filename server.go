@@ -243,7 +243,7 @@ func (s *_Server) Request(node string, i ruid.ID, m uint64, p []byte, cs ...uint
 			if service, ok := s.local[c]; !ok {
 				errors = append(errors, fmt.Sprintf("\n>>>> No local service found: %s(%v) %v %v", s.symdict[c], c, s.Node, s.local))
 			} else if r, e := service.Procedure(i, m, p); e != nil {
-				errors = append(errors, fmt.Sprintf("\n>>>> Procedure %s(%v) error\n>>>> %v", s.symdict[c], c, e))
+				errors = append(errors, fmt.Sprintf("\n>>>> Procedure %s(%v) %s(%v) error\n>>>> %v", s.symdict[c], c, s.symdict[m], m, e))
 			} else {
 				rs = append(rs, r)
 			}
