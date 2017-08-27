@@ -526,13 +526,21 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 	}
 
 	return fmt.Sprintf(`
-func (e *Entity) %s(%s) (%serr error) {%s
+func (e *Entity) %s(%s) (%serr error) {
+	if e == nil {
+		err = fmt.Errorf("[Entity] Distribute %s is called on nil entity")
+		return
+	}%s
 	return
 }
 
-func (c *ClientDelegate) %s(%s) (%serr error) {%s
+func (c *ClientDelegate) %s(%s) (%serr error) {
+	if c == nil || c.s == nil || c.e == nil {
+		err = fmt.Errorf("[Entity] Message %s is called on nil client")
+		return
+	}%s
 	return
 }
-`, method.Name, strings.Join(params_declare, ", "), dist_declare, dist_result,
-		method.Name, strings.Join(params_declare, ", "), proc_declare, proc_result), pkgs
+`, method.Name, strings.Join(params_declare, ", "), dist_declare, method.Name, dist_result,
+		method.Name, strings.Join(params_declare, ", "), proc_declare, method.Name, proc_result), pkgs
 }
