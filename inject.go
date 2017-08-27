@@ -149,7 +149,7 @@ func injectProcedureCallee(service *tygo.Object, method *tygo.Method) (string, m
 	case SYMBOL_%s:
 		methodName = %q
 		if service, exist := s.services[i]; !exist {
-			err = fmt.Errorf("[%s] Service %s ID not exists: %%v", i)
+			err = fmt.Errorf("[%s] Service '%s' ID not exists: %%v", i)
 		}%s%s
 `, method.Name, method.Name, service.Name, method.Name, param, result), FMT_PKG
 }
@@ -215,7 +215,7 @@ func (s *%sServiceImpl) Procedure(i ruid.ID, method uint64, param []byte) (resul
 		s.mutex.Lock()
 		defer s.mutex.Unlock()
 		if _, exist := s.services[i]; exist {
-			err = fmt.Errorf("[%s] Service create ID already exists: %%v", i)
+			err = fmt.Errorf("[%s] Service create - ID already exists: %%v", i)
 		} else {
 			input := &tygo.ProtoBuf{Buffer: param}
 			var t uint64
@@ -234,14 +234,14 @@ func (s *%sServiceImpl) Procedure(i ruid.ID, method uint64, param []byte) (resul
 		s.mutex.Lock()
 		defer s.mutex.Unlock()
 		if %s, exist := s.services[i]; !exist {
-			err = fmt.Errorf("[%s] Service destroy ID not exists: %%v", i)
+			err = fmt.Errorf("[%s] Service destroy - ID not exists: %%v", i)
 		} else {%s
 			delete(s.services, i)
 		}
 	case SYMBOL_SYNCHRON:
 		methodName = "Synchron"
 		if service, exist := s.services[i]; !exist {
-			err = fmt.Errorf("[%s] Service synchron ID not exists: %%v", i)
+			err = fmt.Errorf("[%s] Service synchron - ID not exists: %%v", i)
 		} else {
 			size := service.ByteSize()
 			result = make([]byte, tygo.SizeVarint(SYMBOL_%s) + tygo.SizeVarint(uint64(size)) + size)
@@ -311,19 +311,19 @@ func injectProcedureCaller(owner string, service string, method *tygo.Method, lo
 		checkLocal = fmt.Sprintf(`
 	defer func() {
 		if e := recover(); e != nil {
-			err = fmt.Errorf("[%s] Procedure %s panic:\n>>>> %%v", e)
+			err = fmt.Errorf("[%s] Procedure '%s' panic:\n>>>> %%v", e)
 		}
 	}()
 	if local, exist := %s[s.ID]; exist {%s
 		return
 	}`, service, method.Name, local, result_local)
-		pkgs = update(pkgs, FMT_PKG)
 	}
+	pkgs = update(pkgs, FMT_PKG)
 
 	return fmt.Sprintf(`
 func (s *%s) %s(%s) (%s) {
 	if s == nil {
-		err = fmt.Errorf("[%s] Procedure %s is called on nil service")
+		err = fmt.Errorf("[%s] Procedure '%s' is called on nil service")
 		return
 	}%s%s
 	return

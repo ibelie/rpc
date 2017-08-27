@@ -491,7 +491,6 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 	if len(method.Results) == 1 {
 		result_s, result_p := method.Results[0].Go()
 		pkgs = update(pkgs, result_p)
-		pkgs = update(pkgs, FMT_PKG)
 		pkgs = update(pkgs, STR_PKG)
 		dist_declare = fmt.Sprintf("rs []%s, ", result_s)
 		dist_result = fmt.Sprintf(`
@@ -507,7 +506,7 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 			}
 		}
 		if len(errors) > 0 {
-			err = fmt.Errorf("[%s] %s errors:%%s", strings.Join(errors, ""))
+			err = fmt.Errorf("[%s] Distribute '%s' errors:%%s", strings.Join(errors, ""))
 		}
 	}`, method.Name, param, service.Name, method.Name, service.Name, method.Name)
 		proc_declare = fmt.Sprintf("r %s, ", result_s)
@@ -525,10 +524,11 @@ func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[st
 			method.Name, param)
 	}
 
+	pkgs = update(pkgs, FMT_PKG)
 	return fmt.Sprintf(`
 func (e *Entity) %s(%s) (%serr error) {
 	if e == nil {
-		err = fmt.Errorf("[Entity] Distribute %s is called on nil entity")
+		err = fmt.Errorf("[Entity] Distribute '%s' is called on nil entity")
 		return
 	}%s
 	return
@@ -536,7 +536,7 @@ func (e *Entity) %s(%s) (%serr error) {
 
 func (c *ClientDelegate) %s(%s) (%serr error) {
 	if c == nil || c.s == nil || c.e == nil {
-		err = fmt.Errorf("[Entity] Message %s is called on nil client")
+		err = fmt.Errorf("[Entity] Message '%s' is called on nil client")
 		return
 	}%s
 	return
