@@ -321,11 +321,15 @@ func injectProcedureCaller(owner string, service string, method *tygo.Method, lo
 	}
 
 	return fmt.Sprintf(`
-func (s *%s) %s(%s) (%s) {%s%s
+func (s *%s) %s(%s) (%s) {
+	if s == nil {
+		err = fmt.Errorf("[%s] Procedure %s is called on nil service")
+		return
+	}%s%s
 	return
 }
 `, owner, method.Name, strings.Join(params_declare, ", "), strings.Join(results_declare, ", "),
-		checkLocal, result_remote), pkgs
+		service, method.Name, checkLocal, result_remote), pkgs
 }
 
 func injectServiceProperty(service *tygo.Object) (string, map[string]string) {
