@@ -314,6 +314,11 @@ func proxySymbols(entities []*Entity) string {
 		symbolValues = append(symbolValues, fmt.Sprintf(`
 	%q: %sSYMBOL_%s,`, s, strings.Repeat(" ", maxSymbol-len(s)), s))
 	}
+	symbolConsts = append(symbolConsts, fmt.Sprintf(`
+	SYMBOL_%s`, SYMBOL_MAX_STR))
+	symbolValues = append(symbolValues, fmt.Sprintf(`
+	%q: %sSYMBOL_%s,`, SYMBOL_MAX_STR, strings.Repeat(" ",
+		maxSymbol-len(SYMBOL_MAX_STR)), SYMBOL_MAX_STR))
 
 	return fmt.Sprintf(`
 const (%s
@@ -350,7 +355,7 @@ func proxyRoutes(entities []*Entity) string {
 		for m, ok := range pMethods {
 			if ok {
 				if ok, exist := cMethods[m]; ok && exist {
-					methodMap[m] = append(methodMap[m], e.Name)
+					methodMap[m] = append(methodMap[m], fmt.Sprintf("%s + SYMBOL_MAX", e.Name))
 				}
 			}
 		}

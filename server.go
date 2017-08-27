@@ -23,7 +23,10 @@ const (
 	SYMBOL_NOTIFY
 	SYMBOL_OBSERVE
 	SYMBOL_IGNORE
+	SYMBOL_MAX_STR = "MAX"
 )
+
+var SYMBOL_MAX uint64
 
 var BUILTIN_SYMBOLS = []string{
 	"GATE",
@@ -110,6 +113,7 @@ func NewServer(address string, symbols map[string]uint64, routes map[uint64]map[
 	for symbol, value := range symbols {
 		server.symdict[value] = symbol
 	}
+	SYMBOL_MAX = server.symbols[SYMBOL_MAX_STR]
 
 	for _, r := range rs {
 		i, c := r(server, symbols)
@@ -166,7 +170,7 @@ func (s *_Server) Distribute(i ruid.ID, k ruid.ID, t uint64, m uint64, p []byte)
 				components = append(components, c)
 			}
 		}
-		if ok, exist := cs[t]; ok && exist {
+		if ok, exist := cs[t+SYMBOL_MAX]; ok && exist {
 			components = append(components, clientDelegate)
 		}
 	}
