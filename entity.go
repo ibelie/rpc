@@ -54,16 +54,13 @@ var (
 
 const (
 	ENTITY_CODE = `
-var (
-	Server  rpc.Server
-	Symbols map[string]uint64
-)
+var Server  rpc.Server
 
 type Entity struct {
 	tygo.Tygo
 	ruid.ID
 	Key  ruid.ID
-	Type uint64
+	Type string
 }
 
 type ClientDelegate struct {
@@ -71,27 +68,25 @@ type ClientDelegate struct {
 	s *Entity
 }
 
-func NewEntity(i ruid.ID, k ruid.ID, t string) *Entity {
-	return &Entity{ID: i, Key: k, Type: Symbols[t]}
-}
-
 func (e *Entity) Client(session *Entity) *ClientDelegate {
 	return &ClientDelegate{e: e, s: session}
 }
 
 func (e *Entity) Create() (err error) {
-	t := e.Type << 1
-	size := tygo.SizeVarint(t)
+	t := []byte(e.Type)
+	size := 1 + len(t)
 	if e.Key.Nonzero() {
 		size += e.Key.ByteSize()
-		t |= 1
 	}
 	data := make([]byte, size)
 	output := &tygo.ProtoBuf{Buffer: data}
-	output.WriteVarint(t)
 	if e.Key.Nonzero() {
+		output.WriteBytes(1)
 		e.Key.Serialize(output)
+	} else {
+		output.WriteBytes(0)
 	}
+	output.Write(t)
 	_, err = Server.Distribute(e.ID, e.Key, e.Type, SYMBOL_CREATE, data)
 	return
 }
@@ -103,7 +98,7 @@ func (e *Entity) Destroy() (err error) {
 
 func (e *Entity) ByteSize() (size int) {
 	if e != nil {
-		size = tygo.SizeVarint(e.Type << 2)
+		size = 1 + len([]byte(e.Type))
 		if e.ID.Nonzero() {
 			size += e.ID.ByteSize()
 		}
@@ -117,7 +112,7 @@ func (e *Entity) ByteSize() (size int) {
 
 func (e *Entity) Serialize(output *tygo.ProtoBuf) {
 	if e != nil {
-		t := e.Type << 2
+		var t uint64
 		if e.ID.Nonzero() {
 			t |= 1
 		}
@@ -131,6 +126,7 @@ func (e *Entity) Serialize(output *tygo.ProtoBuf) {
 		if e.Key.Nonzero() {
 			e.Key.Serialize(output)
 		}
+		output.Write([]byte(e.Type))
 	}
 }
 
@@ -149,7 +145,7 @@ func (e *Entity) Deserialize(input *tygo.ProtoBuf) (err error) {
 	} else if e.Key, err = Server.DeserializeID(input); err != nil {
 		return
 	}
-	e.Type = t >> 2
+	e.Type = string(input.Bytes())
 	return
 }
 `
@@ -314,11 +310,6 @@ func proxySymbols(entities []*Entity) string {
 		symbolValues = append(symbolValues, fmt.Sprintf(`
 	%q: %sSYMBOL_%s,`, s, strings.Repeat(" ", maxSymbol-len(s)), s))
 	}
-	symbolConsts = append(symbolConsts, fmt.Sprintf(`
-	SYMBOL_%s`, SYMBOL_MAX_STR))
-	symbolValues = append(symbolValues, fmt.Sprintf(`
-	%q: %sSYMBOL_%s,`, SYMBOL_MAX_STR, strings.Repeat(" ",
-		maxSymbol-len(SYMBOL_MAX_STR)), SYMBOL_MAX_STR))
 
 	return fmt.Sprintf(`
 const (%s
@@ -355,7 +346,7 @@ func proxyRoutes(entities []*Entity) string {
 		for m, ok := range pMethods {
 			if ok {
 				if ok, exist := cMethods[m]; ok && exist {
-					methodMap[m] = append(methodMap[m], fmt.Sprintf("%s + SYMBOL_MAX", e.Name))
+					methodMap[m] = append(methodMap[m], fmt.Sprintf(CLIENT_ENTITY_FMT, e.Name))
 				}
 			}
 		}

@@ -15,6 +15,8 @@ import (
 )
 
 var (
+	GATE_SYMBOLS   = make(map[string]uint64)
+	GATE_SYMDICT   = make(map[uint64]string)
 	SYMBOL_SESSION uint64
 	CREATE_SESSION []byte
 	HANDSHAKE_DATA []byte
@@ -31,30 +33,31 @@ func GateService(_ Server, _ map[string]uint64) (uint64, Service) {
 	return SYMBOL_GATE, &GateInst
 }
 
-func Gate(address string, session string, network Network) {
-	SYMBOL_SESSION = server.symbols[session]
-	sessionType := (SYMBOL_SESSION << 1) | 1
+func Gate(address string, session string, network Network, symbols []string) {
+	SYMBOL_SESSION = session
 	sessionID := server.ServerID()
-	CREATE_SESSION = make([]byte, tygo.SizeVarint(sessionType)+sessionID.ByteSize())
+	sessionBytes := []byte(SYMBOL_SESSION)
+	CREATE_SESSION = make([]byte, 1+len(sessionBytes)+sessionID.ByteSize())
 	output := &tygo.ProtoBuf{Buffer: CREATE_SESSION}
-	output.WriteVarint(sessionType)
+	output.WriteBytes(1)
 	sessionID.Serialize(output)
+	output.Write(sessionBytes)
 
-	syms := 0
-	for name, value := range server.symbols {
-		symbol := []byte(name)
-		syms += tygo.SizeVarint(uint64(len(symbol))) + len(symbol) + tygo.SizeVarint(value)
+	size := 0
+	for i, symbol := range symbols {
+		size += tygo.SizeBuffer([]byte(symbol))
+		GATE_SYMBOLS[symbol] = i
+		GATE_SYMDICT[i] = symbol
 	}
-	serverID := server.ServerID()
-	HANDSHAKE_DATA = make([]byte, syms+tygo.SizeVarint(uint64(syms))+serverID.ByteSize()+tygo.SizeVarint(SYMBOL_SESSION))
+	HANDSHAKE_DATA = make([]byte, tygo.SizeVarint(uint64(size))+size+
+		serverID.ByteSize()+tygo.SizeBuffer(sessionBytes))
 	output = &tygo.ProtoBuf{Buffer: HANDSHAKE_DATA}
-	output.WriteVarint(uint64(syms))
-	for symbol, value := range server.symbols {
+	output.WriteVarint(uint64(size))
+	for _, symbol := range symbols {
 		output.WriteBuf([]byte(symbol))
-		output.WriteVarint(value)
 	}
 	serverID.Serialize(output)
-	output.WriteVarint(SYMBOL_SESSION)
+	output.WriteBuf(sessionBytes)
 
 	network.Serve(address, GateInst.handler)
 }
@@ -82,46 +85,50 @@ func (s *GateImpl) handler(gate Connection) {
 			log.Printf("[Gate@%v] Receive error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 			break
 		}
-		var t, m uint64
+		var tag, method uint64
+		var t, m string
 		var i, k ruid.ID
 		input := &tygo.ProtoBuf{Buffer: data}
-		if t, err = input.ReadVarint(); err != nil {
+		if tag, err = input.ReadVarint(); err != nil {
 			log.Printf("[Gate@%v] Read Type error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 			break
+		} else {
+			t = GATE_SYMDICT[tag>>2]
 		}
-		if t&1 == 0 {
+		if tag&1 == 0 {
 			i = server.ZeroID()
 		} else if i, err = server.DeserializeID(input); err != nil {
 			log.Printf("[Gate@%v] Read ID error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 			break
 		}
-		if t&2 == 0 {
+		if tag&2 == 0 {
 			k = server.ZeroID()
 		} else if k, err = server.DeserializeID(input); err != nil {
 			log.Printf("[Gate@%v] Read Key error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 			break
 		}
-		if m, err = input.ReadVarint(); err != nil {
+		if method, err = input.ReadVarint(); err != nil {
 			log.Printf("[Gate@%v] Read method error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 			break
+		} else {
+			m = GATE_SYMDICT[method]
 		}
-		t >>= 2
 		switch m {
 		case SYMBOL_OBSERVE:
 			if components, err := server.Distribute(i, k, t, SYMBOL_SYNCHRON, nil); err != nil {
-				log.Printf("[Gate@%v] Synchron %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], i, k, gate.Address(), session, err)
+				log.Printf("[Gate@%v] Synchron %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, t, i, k, gate.Address(), session, err)
 			} else if _, err = server.Procedure(i, k, t, SYMBOL_HUB, SYMBOL_OBSERVE, SESSION_BYTES); err != nil {
-				log.Printf("[Gate@%v] Observe %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], i, k, gate.Address(), session, err)
+				log.Printf("[Gate@%v] Observe %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, t, i, k, gate.Address(), session, err)
 			} else if err := gate.Send(SerializeSynchron(i, components)); err != nil {
-				log.Printf("[Gate@%v] Send %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], i, k, gate.Address(), session, err)
+				log.Printf("[Gate@%v] Send %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, t, i, k, gate.Address(), session, err)
 			}
 		case SYMBOL_IGNORE:
 			if _, err := server.Procedure(i, k, t, SYMBOL_HUB, SYMBOL_IGNORE, SESSION_BYTES); err != nil {
-				log.Printf("[Gate@%v] Ignore %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[t], i, k, gate.Address(), session, err)
+				log.Printf("[Gate@%v] Ignore %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, t, i, k, gate.Address(), session, err)
 			}
 		default:
 			if _, err := server.Distribute(i, k, t, m, input.Bytes()); err != nil {
-				log.Printf("[Gate@%v] Distribute %s(%v) to %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, server.symdict[m], m, server.symdict[t], i, k, gate.Address(), session, err)
+				log.Printf("[Gate@%v] Distribute %q to %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, m, t, i, k, gate.Address(), session, err)
 			}
 		}
 	}
@@ -134,13 +141,14 @@ func (s *GateImpl) handler(gate Connection) {
 	}
 }
 
-func (s *GateImpl) Procedure(i ruid.ID, method uint64, param []byte) (result []byte, err error) {
+func (s *GateImpl) Procedure(i ruid.ID, m string, param []byte) (result []byte, err error) {
 	var observers []ruid.ID
 	if observers, param, err = DeserializeDispatch(param); err != nil {
-		err = fmt.Errorf("[Gate] Dispatch deserialize error: %v %s(%v)\n>>>> %v", i, server.symdict[method], method, err)
+		err = fmt.Errorf("[Gate] Dispatch %q deserialize error: %v\n>>>> %v", m, i, err)
 		return
 	}
-	size := i.ByteSize() + tygo.SizeVarint(method) + tygo.SizeVarint(uint64(len(param))) + len(param)
+	method := GATE_SYMBOLS[m]
+	size := i.ByteSize() + tygo.SizeVarint(method) + tygo.SizeBuffer(param)
 	data := make([]byte, size)
 	output := &tygo.ProtoBuf{Buffer: data}
 	i.Serialize(output)

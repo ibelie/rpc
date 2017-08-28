@@ -40,8 +40,7 @@ func (s STRID) String() string {
 }
 
 func (s STRID) ByteSize() (size int) {
-	l := len([]byte(s))
-	return tygo.SizeVarint(uint64(l)) + l
+	return tygo.SizeBuffer([]byte(s))
 }
 
 func (s STRID) Serialize(output *tygo.ProtoBuf) {

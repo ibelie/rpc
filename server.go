@@ -14,29 +14,28 @@ import (
 	"github.com/ibelie/tygo"
 )
 
+const CLIENT_ENTITY_FMT = "%sClient"
+
 const (
-	SYMBOL_GATE uint64 = iota
-	SYMBOL_HUB
-	SYMBOL_CREATE
-	SYMBOL_DESTROY
-	SYMBOL_SYNCHRON
-	SYMBOL_NOTIFY
-	SYMBOL_OBSERVE
-	SYMBOL_IGNORE
-	SYMBOL_MAX_STR = "MAX"
+	SYMBOL_GATE     = "GATE"
+	SYMBOL_HUB      = "HUB"
+	SYMBOL_CREATE   = "CREATE"
+	SYMBOL_DESTROY  = "DESTROY"
+	SYMBOL_SYNCHRON = "SYNCHRON"
+	SYMBOL_NOTIFY   = "NOTIFY"
+	SYMBOL_OBSERVE  = "OBSERVE"
+	SYMBOL_IGNORE   = "IGNORE"
 )
 
-var SYMBOL_MAX uint64
-
 var BUILTIN_SYMBOLS = []string{
-	"GATE",
-	"HUB",
-	"CREATE",
-	"DESTROY",
-	"SYNCHRON",
-	"NOTIFY",
-	"OBSERVE",
-	"IGNORE",
+	SYMBOL_GATE,
+	SYMBOL_HUB,
+	SYMBOL_CREATE,
+	SYMBOL_DESTROY,
+	SYMBOL_SYNCHRON,
+	SYMBOL_NOTIFY,
+	SYMBOL_OBSERVE,
+	SYMBOL_IGNORE,
 }
 
 type Connection interface {
@@ -53,30 +52,28 @@ type Network interface {
 
 type Node struct {
 	Addr string
-	Srvs []uint64
+	Srvs []string
 }
 
 type _Server struct {
 	Node
 	Network
 	ruid.Ident
-	mutex   sync.Mutex
-	routes  map[uint64]map[uint64]bool
-	symbols map[string]uint64
-	symdict map[uint64]string
-	nodes   map[string]*Node
-	conns   map[string]*sync.Pool
-	remote  map[uint64]*ruid.Ring
-	local   map[uint64]Service
+	mutex  sync.Mutex
+	routes map[string]map[string]bool
+	nodes  map[string]*Node
+	conns  map[string]*sync.Pool
+	remote map[string]*ruid.Ring
+	local  map[string]Service
 }
 
 var server *_Server
 
 type Service interface {
-	Procedure(ruid.ID, uint64, []byte) ([]byte, error)
+	Procedure(ruid.ID, string, []byte) ([]byte, error)
 }
 
-type Register func(Server, map[string]uint64) (uint64, Service)
+type Register func(Server) (string, Service)
 
 type Server interface {
 	Serve()
@@ -88,35 +85,28 @@ type Server interface {
 	ZeroID() ruid.ID
 	ServerID() ruid.ID
 	DeserializeID(*tygo.ProtoBuf) (ruid.ID, error)
-	Notify(ruid.ID, ruid.ID, uint64, []byte) error
-	Message(ruid.ID, ruid.ID, ruid.ID, uint64, []byte) ([]byte, error)
-	Distribute(ruid.ID, ruid.ID, uint64, uint64, []byte) ([][]byte, error)
-	Procedure(ruid.ID, ruid.ID, uint64, uint64, uint64, []byte) ([]byte, error)
-	Request(string, ruid.ID, uint64, []byte, ...uint64) ([][]byte, error)
+	Notify(ruid.ID, ruid.ID, string, []byte) error
+	Message(ruid.ID, ruid.ID, ruid.ID, string, []byte) ([]byte, error)
+	Distribute(ruid.ID, ruid.ID, string, string, []byte) ([][]byte, error)
+	Procedure(ruid.ID, ruid.ID, string, string, string, []byte) ([]byte, error)
+	Request(string, ruid.ID, string, []byte, ...string) ([][]byte, error)
 }
 
-func NewServer(address string, symbols map[string]uint64, routes map[uint64]map[uint64]bool,
+func NewServer(address string, routes map[string]map[string]bool,
 	ident ruid.Ident, network Network, rs ...Register) Server {
 	server = &_Server{
 		Node:    Node{Addr: address},
 		Ident:   ident,
 		Network: network,
 		routes:  routes,
-		symbols: symbols,
-		symdict: make(map[uint64]string),
 		nodes:   make(map[string]*Node),
 		conns:   make(map[string]*sync.Pool),
-		remote:  make(map[uint64]*ruid.Ring),
-		local:   make(map[uint64]Service),
+		remote:  make(map[string]*ruid.Ring),
+		local:   make(map[string]Service),
 	}
-
-	for symbol, value := range symbols {
-		server.symdict[value] = symbol
-	}
-	SYMBOL_MAX = server.symbols[SYMBOL_MAX_STR]
 
 	for _, r := range rs {
-		i, c := r(server, symbols)
+		i, c := r(server)
 		server.Srvs = append(server.Srvs, i)
 		server.remote[i] = ruid.NewRing(ident, address)
 		server.local[i] = c
@@ -136,25 +126,23 @@ func (s *_Server) DeserializeID(input *tygo.ProtoBuf) (ruid.ID, error) {
 	return s.Ident.Deserialize(input)
 }
 
-func (s *_Server) Notify(i ruid.ID, k ruid.ID, t uint64, p []byte) (err error) {
+func (s *_Server) Notify(i ruid.ID, k ruid.ID, t string, p []byte) (err error) {
 	_, err = s.Procedure(i, k, t, SYMBOL_HUB, SYMBOL_NOTIFY, p)
 	return
 }
 
-func (s *_Server) Distribute(i ruid.ID, k ruid.ID, t uint64, m uint64, p []byte) (rs [][]byte, err error) {
+var ClientEntityCache = make(map[string]string)
+
+func (s *_Server) Distribute(i ruid.ID, k ruid.ID, t string, m string, p []byte) (rs [][]byte, err error) {
 	if !k.Nonzero() {
 		k = i
 	}
-	clientDelegate := SYMBOL_HUB
-	if t == SYMBOL_SESSION {
-		clientDelegate = SYMBOL_GATE
-	}
 
 	var errors []string
-	var components []uint64
+	var components []string
 
 	if routes, ok := s.routes[t]; !ok {
-		err = fmt.Errorf("[Distribute] Unknown entity type: %s(%v)", s.symdict[t], t)
+		err = fmt.Errorf("[Distribute] Unknown entity type %q", t)
 		return
 	} else if cs, exist := s.routes[m]; !exist {
 		for c, ok := range routes {
@@ -170,17 +158,29 @@ func (s *_Server) Distribute(i ruid.ID, k ruid.ID, t uint64, m uint64, p []byte)
 				components = append(components, c)
 			}
 		}
-		if ok, exist := cs[t+SYMBOL_MAX]; ok && exist {
-			components = append(components, clientDelegate)
+
+		var clientEntity string
+		if name, ok := ClientEntityCache[t]; ok {
+			clientEntity = name
+		} else {
+			clientEntity = fmt.Sprintf(CLIENT_ENTITY_FMT, t)
+			ClientEntityCache[t] = clientEntity
+		}
+		if ok, exist := cs[clientEntity]; ok && exist {
+			if t == SYMBOL_SESSION {
+				components = append(components, SYMBOL_GATE)
+			} else {
+				components = append(components, SYMBOL_HUB)
+			}
 		}
 	}
 
-	services := make(map[string][]uint64)
+	services := make(map[string][]string)
 	for _, c := range components {
 		if ring, ok := s.remote[c]; !ok {
-			errors = append(errors, fmt.Sprintf("\n>>>> Unknown service type: %s(%v)", s.symdict[c], c))
+			errors = append(errors, fmt.Sprintf("\n>>>> Unknown service type %q", c))
 		} else if node, ok := ring.Get(k); !ok {
-			errors = append(errors, fmt.Sprintf("\n>>>> No service found: %s(%v) %v %v", s.symdict[c], c, s.Node, s.nodes))
+			errors = append(errors, fmt.Sprintf("\n>>>> No service %q found: %v %v", c, s.Node, s.nodes))
 		} else if c != SYMBOL_GATE {
 			services[node] = append(services[node], c)
 		} else if _, err = s.Request(node, i, m, SerializeDispatch(map[ruid.ID]bool{i: true}, p), c); err != nil {
@@ -197,12 +197,12 @@ func (s *_Server) Distribute(i ruid.ID, k ruid.ID, t uint64, m uint64, p []byte)
 	}
 
 	if len(errors) > 0 {
-		err = fmt.Errorf("[Distribute] %s(%v:%v) %s(%v) errors:%s", s.symdict[t], i, k, s.symdict[m], m, strings.Join(errors, ""))
+		err = fmt.Errorf("[Distribute] %s(%v:%v) %q errors:%s", t, i, k, m, strings.Join(errors, ""))
 	}
 	return
 }
 
-func (s *_Server) Message(i ruid.ID, k ruid.ID, t ruid.ID, m uint64, p []byte) (r []byte, err error) {
+func (s *_Server) Message(i ruid.ID, k ruid.ID, t ruid.ID, m string, p []byte) (r []byte, err error) {
 	if ring, ok := s.remote[SYMBOL_GATE]; !ok {
 		err = fmt.Errorf("[Message] Cannot find gate service: %v %v %v", s.remote, s.Node, s.nodes)
 	} else if node, ok := ring.Get(k); !ok {
@@ -215,7 +215,7 @@ func (s *_Server) Message(i ruid.ID, k ruid.ID, t ruid.ID, m uint64, p []byte) (
 	return
 }
 
-func (s *_Server) Procedure(i ruid.ID, k ruid.ID, t uint64, c uint64, m uint64, p []byte) (r []byte, err error) {
+func (s *_Server) Procedure(i ruid.ID, k ruid.ID, t string, c string, m string, p []byte) (r []byte, err error) {
 	if !k.Nonzero() {
 		k = i
 	}
@@ -225,9 +225,9 @@ func (s *_Server) Procedure(i ruid.ID, k ruid.ID, t uint64, c uint64, m uint64, 
 	}
 
 	if ring, ok := s.remote[c]; !ok {
-		err = fmt.Errorf("[Procedure] Unknown service type: %s(%v)", s.symdict[c], c)
+		err = fmt.Errorf("[Procedure] Unknown service type %q", c)
 	} else if node, ok := ring.Get(k); !ok {
-		err = fmt.Errorf("[Procedure] No service found: %s(%v) %v %v", s.symdict[c], c, s.Node, s.nodes)
+		err = fmt.Errorf("[Procedure] No service %q found: %v %v", c, s.Node, s.nodes)
 	} else if rs, e := s.Request(node, i, m, p, c); e != nil || len(rs) <= 0 {
 		err = e
 	} else {
@@ -236,14 +236,14 @@ func (s *_Server) Procedure(i ruid.ID, k ruid.ID, t uint64, c uint64, m uint64, 
 	return
 }
 
-func (s *_Server) Request(node string, i ruid.ID, m uint64, p []byte, cs ...uint64) (rs [][]byte, err error) {
+func (s *_Server) Request(node string, i ruid.ID, m string, p []byte, cs ...string) (rs [][]byte, err error) {
 	var errors []string
 	if node == s.Addr {
 		for _, c := range cs {
 			if service, ok := s.local[c]; !ok {
-				errors = append(errors, fmt.Sprintf("\n>>>> No local service found: %s(%v) %v %v", s.symdict[c], c, s.Node, s.local))
+				errors = append(errors, fmt.Sprintf("\n>>>> No local service %q found: %v %v", c, s.Node, s.local))
 			} else if r, e := service.Procedure(i, m, p); e != nil {
-				errors = append(errors, fmt.Sprintf("\n>>>> Procedure %s(%v) %s(%v) error\n>>>> %v", s.symdict[c], c, s.symdict[m], m, e))
+				errors = append(errors, fmt.Sprintf("\n>>>> Procedure %q of Service %q error\n>>>> %v", m, c, e))
 			} else {
 				rs = append(rs, r)
 			}
@@ -289,7 +289,7 @@ func (s *_Server) Request(node string, i ruid.ID, m uint64, p []byte, cs ...uint
 
 request_end:
 	if len(errors) > 0 {
-		err = fmt.Errorf("[Request] %s %v %s(%v) errors:%s", node, i, s.symdict[m], m, strings.Join(errors, ""))
+		err = fmt.Errorf("[Request] %s %v %q errors:%s", node, i, m, strings.Join(errors, ""))
 	}
 	return
 }
@@ -305,22 +305,21 @@ func (s *_Server) handler(conn Connection) {
 			var rs [][]byte
 			for _, c := range cs {
 				if service, ok := s.local[c]; !ok {
-					log.Printf("[Server@%v] Service %s(%v) not exists", s.Addr, s.symdict[c], c)
+					log.Printf("[Server@%v] Service %q not exists", s.Addr, c)
 				} else if r, err := service.Procedure(i, m, p); err != nil {
-					log.Printf("[Server@%v] Procedure %s(%v) error:\n>>>> %v", s.Addr, s.symdict[c], c, err)
+					log.Printf("[Server@%v] Procedure %q error:\n>>>> %v", s.Addr, c, err)
 				} else {
 					rs = append(rs, r)
 				}
 			}
 			var size int
 			for _, r := range rs {
-				size += tygo.SizeVarint(uint64(len(r))) + len(r)
+				size += tygo.SizeBuffer(r)
 			}
 			result := make([]byte, size)
 			output := &tygo.ProtoBuf{Buffer: result}
 			for _, r := range rs {
-				output.WriteVarint(uint64(len(r)))
-				output.Write(r)
+				output.WriteBuf(r)
 			}
 			if err := conn.Send(result); err != nil {
 				log.Printf("[Server@%v] Response error:\n>>>> %v", s.Addr, err)
@@ -378,39 +377,42 @@ func (s *_Server) Remove(key string) {
 	delete(s.nodes, key)
 }
 
-func SerializeRequest(i ruid.ID, ss []uint64, m uint64, p []byte) (data []byte) {
+func SerializeRequest(i ruid.ID, ss []string, m string, p []byte) (data []byte) {
 	var size int
 	for _, s := range ss {
-		size += tygo.SizeVarint(s)
+		size += tygo.SizeBuffer([]byte(s))
 	}
-	data = make([]byte, tygo.SizeVarint(m)+tygo.SizeVarint(uint64(size))+size+len(p)+i.ByteSize())
+	data = make([]byte, i.ByteSize()+tygo.SizeVarint(uint64(size))+size+
+		tygo.SizeBuffer([]byte(m))+len(p))
 	output := &tygo.ProtoBuf{Buffer: data}
 	i.Serialize(output)
-	output.WriteVarint(m)
 	output.WriteVarint(uint64(size))
 	for _, s := range ss {
-		output.WriteVarint(s)
+		output.WriteBuf([]byte(s))
 	}
+	output.WriteBuf([]byte(m))
 	output.Write(p)
 	return
 }
 
-func DeserializeRequest(data []byte) (i ruid.ID, ss []uint64, m uint64, p []byte, err error) {
+func DeserializeRequest(data []byte) (i ruid.ID, ss []string, m string, p []byte, err error) {
 	input := &tygo.ProtoBuf{Buffer: data}
 	if i, err = server.DeserializeID(input); err != nil {
-	} else if m, err = input.ReadVarint(); err != nil {
 	} else if p, err = input.ReadBuf(); err != nil {
 	} else {
 		buffer := &tygo.ProtoBuf{Buffer: p}
 		for !buffer.ExpectEnd() {
 			if s, e := buffer.ReadVarint(); e != nil {
 				err = e
-				break
+				return
 			} else {
 				ss = append(ss, s)
 			}
 		}
-		p = input.Bytes()
+		if p, err = input.ReadBuf(); err == nil {
+			m = string(p)
+			p = input.Bytes()
+		}
 	}
 	return
 }

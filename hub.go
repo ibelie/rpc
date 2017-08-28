@@ -20,12 +20,12 @@ type HubImpl struct {
 
 var HubInst = HubImpl{observers: make(map[ruid.ID]map[string]map[ruid.ID]bool)}
 
-func HubService(_ Server, _ map[string]uint64) (uint64, Service) {
+func HubService(_ Server) (string, Service) {
 	return SYMBOL_HUB, &HubInst
 }
 
-func (s *HubImpl) Procedure(i ruid.ID, method uint64, param []byte) (result []byte, err error) {
-	switch method {
+func (s *HubImpl) Procedure(i ruid.ID, m string, param []byte) (result []byte, err error) {
+	switch m {
 	case SYMBOL_OBSERVE:
 		if session, gate, e := DeserializeSessionGate(param); e != nil {
 			err = fmt.Errorf("[Hub] Observe deserialize error: %v\n>>>> %v", i, e)
@@ -70,12 +70,12 @@ func (s *HubImpl) Procedure(i ruid.ID, method uint64, param []byte) (result []by
 				errors = append(errors, fmt.Sprintf("\n>>>> [Hub] Dispatch gate no observer %v %v", i, gate))
 				continue
 			}
-			if _, err = server.Request(gate, i, method, SerializeDispatch(observers, param), SYMBOL_GATE); err != nil {
+			if _, err = server.Request(gate, i, m, SerializeDispatch(observers, param), SYMBOL_GATE); err != nil {
 				errors = append(errors, fmt.Sprintf("\n>>>> gate: %v\n>>>> %v", gate, err))
 			}
 		}
 		if len(errors) > 0 {
-			err = fmt.Errorf("[Hub] Dispatch errors %v %s(%v):%s", i, server.symdict[method], method, strings.Join(errors, ""))
+			err = fmt.Errorf("[Hub] Dispatch %q errors %v:%s", m, i, strings.Join(errors, ""))
 		}
 	}
 	return
