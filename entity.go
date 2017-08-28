@@ -46,6 +46,7 @@ func IDENT_FromString(name string) int {
 var (
 	RPC_PKG    = map[string]string{"github.com/ibelie/rpc": ""}
 	ENTITY_PKG = map[string]string{
+		"fmt": "",
 		"github.com/ibelie/rpc":  "",
 		"github.com/ibelie/ruid": "",
 		"github.com/ibelie/tygo": "",
@@ -131,8 +132,8 @@ func (e *Entity) Serialize(output *tygo.ProtoBuf) {
 }
 
 func (e *Entity) Deserialize(input *tygo.ProtoBuf) (err error) {
-	var t uint64
-	if t, err = input.ReadVarint(); err != nil {
+	var t byte
+	if t, err = input.ReadByte(); err != nil {
 		return
 	}
 	if t&1 == 0 {

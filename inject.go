@@ -147,11 +147,10 @@ func injectProcedureCallee(service *tygo.Object, method *tygo.Method) (string, m
 
 	return fmt.Sprintf(`
 	case SYMBOL_%s:
-		methodName = %q
 		if service, exist := s.services[i]; !exist {
 			err = fmt.Errorf("[%s] Service '%s' ID not exists: %%v", i)
 		}%s%s
-`, method.Name, method.Name, service.Name, method.Name, param, result), FMT_PKG
+`, method.Name, service.Name, method.Name, param, result), FMT_PKG
 }
 
 func injectServiceLocal(service *tygo.Object, object *doc.Type) (string, string, map[string]string) {
@@ -196,41 +195,38 @@ type %sServiceImpl struct {
 
 var %sInst = %sServiceImpl{services: make(map[ruid.ID]*%s)}
 
-func %sService(server rpc.Server, symbols map[string]uint64) (uint64, rpc.Service) {
-	InitializeServer(server, symbols)
+func %sService(server rpc.Server) (string, rpc.Service) {
+	Server = server
 	return SYMBOL_%s, &%sInst
 }
 
-func (s *%sServiceImpl) Procedure(i ruid.ID, method uint64, param []byte) (result []byte, err error) {
-	var methodName string
+func (s *%sServiceImpl) Procedure(i ruid.ID, m string, param []byte) (result []byte, err error) {
 	defer func() {
 		if e := recover(); e != nil {
-			err = fmt.Errorf("[%s] Procedure %%s(%%v) %%v panic:\n>>>> %%v", methodName, method, i, e)
+			err = fmt.Errorf("[%s] Procedure %%q %%v panic:\n>>>> %%v", m, i, e)
 		}
 	}()
 
-	switch method {
+	switch m {
 	case SYMBOL_CREATE:
-		methodName = "Create"
 		s.mutex.Lock()
 		defer s.mutex.Unlock()
 		if _, exist := s.services[i]; exist {
 			err = fmt.Errorf("[%s] Service create - ID already exists: %%v", i)
 		} else {
 			input := &tygo.ProtoBuf{Buffer: param}
-			var t uint64
+			var t byte
 			var k ruid.ID
-			if t, err = input.ReadVarint(); err != nil {
+			if t, err = input.ReadByte(); err != nil {
 				return
 			} else if t & 1 == 0 {
 				k = Server.ZeroID()
 			} else if k, err = Server.DeserializeID(input); err != nil {
 				return
 			}
-			s.services[i] = &%s{Entity: &Entity{ID: i, Key: k, Type: t >> 1}}%s
+			s.services[i] = &%s{Entity: &Entity{ID: i, Key: k, Type: string(input.Bytes())}}%s
 		}
 	case SYMBOL_DESTROY:
-		methodName = "Destroy"
 		s.mutex.Lock()
 		defer s.mutex.Unlock()
 		if %s, exist := s.services[i]; !exist {
@@ -239,7 +235,6 @@ func (s *%sServiceImpl) Procedure(i ruid.ID, method uint64, param []byte) (resul
 			delete(s.services, i)
 		}
 	case SYMBOL_SYNCHRON:
-		methodName = "Synchron"
 		if service, exist := s.services[i]; !exist {
 			err = fmt.Errorf("[%s] Service synchron - ID not exists: %%v", i)
 		} else {

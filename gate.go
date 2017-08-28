@@ -17,7 +17,7 @@ import (
 var (
 	GATE_SYMBOLS   = make(map[string]uint64)
 	GATE_SYMDICT   = make(map[uint64]string)
-	SYMBOL_SESSION uint64
+	SYMBOL_SESSION string
 	CREATE_SESSION []byte
 	HANDSHAKE_DATA []byte
 )
@@ -29,7 +29,7 @@ type GateImpl struct {
 
 var GateInst = GateImpl{gates: make(map[ruid.ID]Connection)}
 
-func GateService(_ Server, _ map[string]uint64) (uint64, Service) {
+func GateService(_ Server) (string, Service) {
 	return SYMBOL_GATE, &GateInst
 }
 
