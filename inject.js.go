@@ -183,7 +183,10 @@ ibelie.rpc.Component = function(entity) {
 };
 
 ibelie.rpc.Component.prototype.Awake = function(e) {
-	if (e.isAwake) {
+	if (!e) {
+		console.warn('[Entity] No entity:', e);
+		return e;
+	} else if (e.isAwake) {
 		console.warn('[Entity] Already awaked:', e);
 		return e;
 	}
@@ -317,9 +320,8 @@ ibelie.rpc.Connection = function(url) {
 };
 
 ibelie.rpc.Connection.prototype.send = function(entity, method, data) {
-	var eType = this.SymDict[entity.Type];
-	var size = 1 + tyts.SizeVarint(eType) + tyts.SizeVarint(method);
-	var t = 0;
+	var t = this.SymDict[entity.Type] << 2;
+	var size = tyts.SizeVarint(t) + tyts.SizeVarint(method);
 	if (entity.ID != ZERO_ID) {
 		size += %s;
 		t |= 1;
@@ -332,14 +334,13 @@ ibelie.rpc.Connection.prototype.send = function(entity, method, data) {
 		size += data.length;
 	}
 	var protobuf = new tyts.ProtoBuf(new Uint8Array(size));
-	protobuf.WriteByte(t);
+	protobuf.WriteVarint(t);
 	if (entity.ID != ZERO_ID) {
 		%s;
 	}
 	if (entity.Key != ZERO_ID) {
 		%s;
 	}
-	protobuf.WriteVarint(eType);
 	protobuf.WriteVarint(method);
 	if (data) {
 		protobuf.WriteBytes(data);
