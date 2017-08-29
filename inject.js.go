@@ -97,7 +97,7 @@ Entity.prototype.%s = function(%s) {
 		v.%s && v.%s.call(%s);
 	}
 	var data = ibelie.rpc.%s.Serialize%sParam(%s);
-	this.connection.send(this, this.connection.Symbols.%s, data);
+	this.connection.send(this, this.connection.SymDict.%s, data);
 };
 `, m.Name, c.Name, m.Name, m.Name, strings.Join(params, ", "),
 					m.Name, m.Name, strings.Join(localParams, ", "),
@@ -132,11 +132,11 @@ Entity = function() {
 	this.isAwake = false;
 	this.ID = ZERO_ID;
 	this.Key = ZERO_ID;
-	this.Type = 0;
+	this.Type = '';
 };
 
 Entity.prototype.ByteSize = function() {
-	var size = tyts.SizeVarint(this.Type << 2);
+	var size = 1 + tyts.String.Size(this.Type);
 	if (this.ID != ZERO_ID) {
 		size += %s;
 	}
@@ -146,35 +146,32 @@ Entity.prototype.ByteSize = function() {
 	return size;
 };
 
-Entity.prototype.SerializeUnsealed = function(protobuf) {
-	var t = this.Type << 2;
+Entity.prototype.Serialize = function() {
+	var protobuf = new tyts.ProtoBuf(new Uint8Array(this.ByteSize()));
+	var t = 0;
 	if (this.ID != ZERO_ID) {
 		t |= 1;
 	}
 	if (this.Key != ZERO_ID) {
 		t |= 2;
 	}
-	protobuf.WriteVarint(t);
+	protobuf.WriteByte(t);
 	if (this.ID != ZERO_ID) {
 		%s;
 	}
 	if (this.Key != ZERO_ID) {
 		%s;
 	}
-};
-
-Entity.prototype.Serialize = function() {
-	var protobuf = new tyts.ProtoBuf(new Uint8Array(this.ByteSize()));
-	this.SerializeUnsealed(protobuf);
+	tyts.String.Write(this.Type, protobuf);
 	return protobuf.buffer;
 };
 
 Entity.prototype.Deserialize = function(data) {
 	var protobuf = new tyts.ProtoBuf(data);
-	var t = protobuf.ReadVarint();
+	var t = protobuf.ReadByte();
 	this.ID = (t & 1) ? %s : ZERO_ID;
 	this.Key = (t & 2) ? %s : ZERO_ID;
-	this.Type = t >>> 2;
+	this.Type = tyts.String.Decode(protobuf.Bytes());
 };
 
 var ibelie = {};
@@ -195,12 +192,12 @@ ibelie.rpc.Component.prototype.Awake = function(e) {
 	if (entity) {
 		return entity
 	}
-	entity = new entities[conn.Dictionary[e.Type]]();
+	entity = new entities[e.Type]();
 	entity.ID = e.ID;
 	entity.Key = e.Key;
 	entity.Type = e.Type;
 	entity.connection = conn;
-	conn.send(e, conn.Symbols.OBSERVE);
+	conn.send(e, conn.SymDict.OBSERVE);
 	conn.entities[entity.ID] = entity;
 	return entity;
 };
@@ -219,7 +216,7 @@ ibelie.rpc.Component.prototype.Drop = function(e) {
 	}
 	e.isAwake = false;
 	var conn = this.Entity.connection;
-	conn.send(e, conn.Symbols.IGNORE);
+	conn.send(e, conn.SymDict.IGNORE);
 	delete conn.entities[e.ID];
 	var entity = new Entity();
 	entity.ID = e.ID;
@@ -237,18 +234,19 @@ ibelie.rpc.Connection = function(url) {
 			var protobuf = tyts.ProtoBuf.FromBase64(event.data);
 			var id = %s;
 			if (!conn.Symbols) {
-				conn.Symbols = {};
-				conn.Dictionary = {};
+				conn.Symbols = [];
+				conn.SymDict = {};
 				var buffer = new tyts.ProtoBuf(protobuf.ReadBuffer());
+				var value = 0;
 				while (!buffer.End()) {
 					var symbol = tyts.String.Deserialize(null, buffer);
-					var value = buffer.ReadVarint();
-					conn.Symbols[symbol] = value;
-					conn.Dictionary[value] = symbol;
+					conn.Symbols.concat(symbol);
+					conn.SymDict[symbol] = value;
+					value++;
 				}
 				var key = %s;
-				var t = protobuf.ReadVarint();
-				entity = new entities[conn.Dictionary[t]]();
+				var t = conn.Symbols[protobuf.ReadVarint()];
+				entity = new entities[t]();
 				entity.connection = conn;
 				entity.ID = id;
 				entity.Key = key;
@@ -262,7 +260,7 @@ ibelie.rpc.Connection = function(url) {
 				}
 			}
 			while (!protobuf.End()) {
-				var name = conn.Dictionary[protobuf.ReadVarint()];
+				var name = conn.Symbols[protobuf.ReadVarint()];
 				var data = protobuf.ReadBuffer();
 				if (ibelie.rpc[name]) {
 					ibelie.rpc[name].prototype.Deserialize.call(entity[name], data);
@@ -271,8 +269,8 @@ ibelie.rpc.Connection = function(url) {
 					continue;
 				} else if (name == 'NOTIFY') {
 					var buffer = new tyts.ProtoBuf(data);
-					var compName = conn.Dictionary[buffer.ReadVarint()];
-					var property = conn.Dictionary[buffer.ReadVarint()];
+					var compName = conn.Symbols[buffer.ReadVarint()];
+					var property = conn.Symbols[buffer.ReadVarint()];
 					var newValue = ibelie.rpc[compName]['Deserialize' + property](buffer.Bytes())[0];
 					var component = entity[compName];
 					var oldValue = component[property];
@@ -319,12 +317,29 @@ ibelie.rpc.Connection = function(url) {
 };
 
 ibelie.rpc.Connection.prototype.send = function(entity, method, data) {
-	var size = entity.ByteSize() + tyts.SizeVarint(method);
+	var eType = this.SymDict[entity.Type];
+	var size = 1 + tyts.SizeVarint(eType) + tyts.SizeVarint(method);
+	var t = 0;
+	if (entity.ID != ZERO_ID) {
+		size += %s;
+		t |= 1;
+	}
+	if (entity.Key != ZERO_ID) {
+		size += %s;
+		t |= 2;
+	}
 	if (data) {
 		size += data.length;
 	}
 	var protobuf = new tyts.ProtoBuf(new Uint8Array(size));
-	entity.SerializeUnsealed(protobuf);
+	protobuf.WriteByte(t);
+	if (entity.ID != ZERO_ID) {
+		%s;
+	}
+	if (entity.Key != ZERO_ID) {
+		%s;
+	}
+	protobuf.WriteVarint(eType);
 	protobuf.WriteVarint(method);
 	if (data) {
 		protobuf.WriteBytes(data);
@@ -340,6 +355,8 @@ ibelie.rpc.Connection.prototype.disconnect = function() {
 		JSID_WRITE[ident]("protobuf", "this.ID"), JSID_WRITE[ident]("protobuf", "this.Key"),
 		JSID_READ[ident]("protobuf"), JSID_READ[ident]("protobuf"),
 		JSID_READ[ident]("protobuf"), JSID_READ[ident]("protobuf"),
+		JSID_BYTESIZE[ident]("this.ID"), JSID_BYTESIZE[ident]("this.Key"),
+		JSID_WRITE[ident]("protobuf", "this.ID"), JSID_WRITE[ident]("protobuf", "this.Key"),
 		strings.Join(methods, ""))))
 
 	ioutil.WriteFile(path.Join(dir, "rpc.js"), buffer.Bytes(), 0666)

@@ -16,5 +16,5 @@ func main() {
 	goOut := flag.String("go", "", "output golang dir")
 	flag.Parse()
 	entities := rpc.Typescript(*ident, *input, *tsOut)
-	rpc.Routes(*ident, *goOut, entities)
+	rpc.Proxy(*ident, *goOut, entities)
 }

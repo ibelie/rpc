@@ -134,7 +134,10 @@ func (s *_Server) Notify(i ruid.ID, k ruid.ID, t string, p []byte) (err error) {
 var ClientEntityCache = make(map[string]string)
 
 func (s *_Server) Distribute(i ruid.ID, k ruid.ID, t string, m string, p []byte) (rs [][]byte, err error) {
-	if !k.Nonzero() {
+	if s.routes == nil {
+		err = fmt.Errorf("[Distribute] Error with nil routes")
+		return
+	} else if !k.Nonzero() {
 		k = i
 	}
 
@@ -402,11 +405,11 @@ func DeserializeRequest(data []byte) (i ruid.ID, ss []string, m string, p []byte
 	} else {
 		buffer := &tygo.ProtoBuf{Buffer: p}
 		for !buffer.ExpectEnd() {
-			if s, e := buffer.ReadVarint(); e != nil {
+			if s, e := buffer.ReadBuf(); e != nil {
 				err = e
 				return
 			} else {
-				ss = append(ss, s)
+				ss = append(ss, string(s))
 			}
 		}
 		if p, err = input.ReadBuf(); err == nil {

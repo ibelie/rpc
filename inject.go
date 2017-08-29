@@ -28,7 +28,7 @@ var (
 		"github.com/ibelie/ruid": "",
 		"github.com/ibelie/tygo": "",
 	}
-	PROP_PRE = []tygo.Type{tygo.SimpleType_UINT64, tygo.SimpleType_UINT64}
+	PROP_PRE = []tygo.Type{tygo.SimpleType_STRING, tygo.SimpleType_STRING}
 	DELEGATE = "Delegate"
 )
 
@@ -239,9 +239,10 @@ func (s *%sServiceImpl) Procedure(i ruid.ID, m string, param []byte) (result []b
 			err = fmt.Errorf("[%s] Service synchron - ID not exists: %%v", i)
 		} else {
 			size := service.ByteSize()
-			result = make([]byte, tygo.SizeVarint(SYMBOL_%s) + tygo.SizeVarint(uint64(size)) + size)
+			bytes := []byte(SYMBOL_%s)
+			result = make([]byte, tygo.SizeBuffer(bytes) + tygo.SizeVarint(uint64(size)) + size)
 			output := &tygo.ProtoBuf{Buffer: result}
-			output.WriteVarint(SYMBOL_%s)
+			output.WriteBuf(bytes)
 			output.WriteVarint(uint64(size))
 			service.Serialize(output)
 		}%s
@@ -251,7 +252,7 @@ func (s *%sServiceImpl) Procedure(i ruid.ID, m string, param []byte) (result []b
 `, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
 		service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
 		onCreate, serviceTemp, service.Name, onDestroy, service.Name, service.Name,
-		service.Name, strings.Join(cases, "")), pkgs
+		strings.Join(cases, "")), pkgs
 }
 
 func injectProcedureCaller(owner string, service string, method *tygo.Method, local string) (string, map[string]string) {

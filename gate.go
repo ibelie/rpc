@@ -15,11 +15,11 @@ import (
 )
 
 var (
-	GATE_SYMBOLS   = make(map[string]uint64)
-	GATE_SYMDICT   = make(map[uint64]string)
 	SYMBOL_SESSION string
 	CREATE_SESSION []byte
 	HANDSHAKE_DATA []byte
+	GATE_SYMBOLS   []string
+	GATE_SYMDICT   = make(map[string]uint64)
 )
 
 type GateImpl struct {
@@ -33,31 +33,32 @@ func GateService(_ Server) (string, Service) {
 	return SYMBOL_GATE, &GateInst
 }
 
-func Gate(address string, session string, network Network, symbols []string) {
+func Gate(address string, session string, symbols []string, network Network) {
 	SYMBOL_SESSION = session
-	sessionID := server.ServerID()
+	serverID := server.ServerID()
 	sessionBytes := []byte(SYMBOL_SESSION)
-	CREATE_SESSION = make([]byte, 1+len(sessionBytes)+sessionID.ByteSize())
+	CREATE_SESSION = make([]byte, 1+len(sessionBytes)+serverID.ByteSize())
 	output := &tygo.ProtoBuf{Buffer: CREATE_SESSION}
 	output.WriteBytes(1)
-	sessionID.Serialize(output)
+	serverID.Serialize(output)
 	output.Write(sessionBytes)
 
 	size := 0
-	for i, symbol := range symbols {
+	GATE_SYMBOLS = symbols
+	for i, symbol := range GATE_SYMBOLS {
 		size += tygo.SizeBuffer([]byte(symbol))
-		GATE_SYMBOLS[symbol] = i
-		GATE_SYMDICT[i] = symbol
+		GATE_SYMDICT[symbol] = uint64(i)
 	}
+	sessionType := GATE_SYMDICT[SYMBOL_SESSION]
 	HANDSHAKE_DATA = make([]byte, tygo.SizeVarint(uint64(size))+size+
-		serverID.ByteSize()+tygo.SizeBuffer(sessionBytes))
+		serverID.ByteSize()+tygo.SizeVarint(sessionType))
 	output = &tygo.ProtoBuf{Buffer: HANDSHAKE_DATA}
 	output.WriteVarint(uint64(size))
-	for _, symbol := range symbols {
+	for _, symbol := range GATE_SYMBOLS {
 		output.WriteBuf([]byte(symbol))
 	}
 	serverID.Serialize(output)
-	output.WriteBuf(sessionBytes)
+	output.WriteVarint(sessionType)
 
 	network.Serve(address, GateInst.handler)
 }
@@ -93,7 +94,7 @@ func (s *GateImpl) handler(gate Connection) {
 			log.Printf("[Gate@%v] Read Type error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 			break
 		} else {
-			t = GATE_SYMDICT[tag>>2]
+			t = GATE_SYMBOLS[tag>>2]
 		}
 		if tag&1 == 0 {
 			i = server.ZeroID()
@@ -111,7 +112,7 @@ func (s *GateImpl) handler(gate Connection) {
 			log.Printf("[Gate@%v] Read method error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 			break
 		} else {
-			m = GATE_SYMDICT[method]
+			m = GATE_SYMBOLS[method]
 		}
 		switch m {
 		case SYMBOL_OBSERVE:
@@ -147,7 +148,7 @@ func (s *GateImpl) Procedure(i ruid.ID, m string, param []byte) (result []byte, 
 		err = fmt.Errorf("[Gate] Dispatch %q deserialize error: %v\n>>>> %v", m, i, err)
 		return
 	}
-	method := GATE_SYMBOLS[m]
+	method := GATE_SYMDICT[m]
 	size := i.ByteSize() + tygo.SizeVarint(method) + tygo.SizeBuffer(param)
 	data := make([]byte, size)
 	output := &tygo.ProtoBuf{Buffer: data}

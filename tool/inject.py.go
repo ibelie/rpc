@@ -17,5 +17,5 @@ func main() {
 	ignore := flag.String("ig", "", "ignore python modules")
 	flag.Parse()
 	entities := rpc.Python(*ident, *input, *pyOut, append(flag.Args(), *ignore))
-	rpc.Routes(*ident, *goOut, entities)
+	rpc.Proxy(*ident, *goOut, entities)
 }
