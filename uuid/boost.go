@@ -7,7 +7,6 @@ package uuid
 import (
 	"bytes"
 	"crypto/md5"
-	"encoding/base64"
 	"github.com/ibelie/ruid"
 	"github.com/ibelie/tygo"
 )
@@ -39,7 +38,7 @@ func (u ID) Nonzero() bool {
 }
 
 func (u ID) String() string {
-	return base64.RawURLEncoding.EncodeToString(u[:])
+	return ruid.RUIDEncoding.EncodeToString(u[:])
 }
 
 func (u ID) ByteSize() (size int) {
