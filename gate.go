@@ -147,6 +147,9 @@ func (s *GateImpl) Procedure(i ruid.ID, m string, param []byte) (result []byte, 
 	if observers, param, err = DeserializeDispatch(param); err != nil {
 		err = fmt.Errorf("[Gate] Dispatch %q deserialize error: %v\n>>>> %v", m, i, err)
 		return
+	} else if param, err = ReserializeNotify(m, param); err != nil {
+		err = fmt.Errorf("[Gate] Reserialize %q error: %v\n>>>> %v", m, i, err)
+		return
 	}
 	method := GATE_SYMDICT[m]
 	size := i.ByteSize() + tygo.SizeVarint(method) + tygo.SizeBuffer(param)
@@ -205,6 +208,33 @@ func DeserializeDispatch(data []byte) (observers []ruid.ID, param []byte, err er
 			}
 		}
 	}
+	return
+}
+
+func ReserializeNotify(method string, data []byte) (param []byte, err error) {
+	param = data
+	if method != SYMBOL_NOTIFY {
+		return
+	}
+
+	input := &tygo.ProtoBuf{Buffer: data}
+	var component, property []byte
+	if component, err = input.ReadBuf(); err != nil {
+		return
+	} else if property, err = input.ReadBuf(); err != nil {
+		return
+	}
+
+	c := GATE_SYMDICT[string(component)]
+	p := GATE_SYMDICT[string(property)]
+	data = input.Bytes()
+
+	size := tygo.SizeVarint(c) + tygo.SizeVarint(p) + len(data)
+	param = make([]byte, size)
+	output := &tygo.ProtoBuf{Buffer: param}
+	output.WriteVarint(c)
+	output.WriteVarint(p)
+	output.Write(data)
 	return
 }
 
