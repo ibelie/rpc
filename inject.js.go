@@ -240,7 +240,7 @@ ibelie.rpc.Connection = function(url) {
 				var value = 0;
 				while (!buffer.End()) {
 					var symbol = tyts.String.Deserialize(null, buffer);
-					conn.Symbols.concat(symbol);
+					conn.Symbols = conn.Symbols.concat(symbol);
 					conn.SymDict[symbol] = value;
 					value++;
 				}

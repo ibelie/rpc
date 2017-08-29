@@ -72,7 +72,9 @@ func (s *GateImpl) handler(gate Connection) {
 		log.Printf("[Gate@%v] Create session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 	} else if components, err := server.Distribute(session, server.ServerID(), SYMBOL_SESSION, SYMBOL_SYNCHRON, nil); err != nil {
 		log.Printf("[Gate@%v] Synchron session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
-	} else if err := gate.Send(SerializeHandshake(session, components)); err != nil {
+	} else if handshake, err := SerializeHandshake(session, components); err != nil {
+		log.Printf("[Gate@%v] Serialize session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
+	} else if err := gate.Send(handshake); err != nil {
 		log.Printf("[Gate@%v] Send session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
 	}
 
@@ -120,7 +122,9 @@ func (s *GateImpl) handler(gate Connection) {
 				log.Printf("[Gate@%v] Synchron %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, t, i, k, gate.Address(), session, err)
 			} else if _, err = server.Procedure(i, k, t, SYMBOL_HUB, SYMBOL_OBSERVE, SESSION_BYTES); err != nil {
 				log.Printf("[Gate@%v] Observe %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, t, i, k, gate.Address(), session, err)
-			} else if err := gate.Send(SerializeSynchron(i, components)); err != nil {
+			} else if synchron, err := SerializeSynchron(i, components); err != nil {
+				log.Printf("[Gate@%v] Serialize %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, t, i, k, gate.Address(), session, err)
+			} else if err := gate.Send(synchron); err != nil {
 				log.Printf("[Gate@%v] Send %s(%v:%v) error %v %v:\n>>>> %v", server.Addr, t, i, k, gate.Address(), session, err)
 			}
 		case SYMBOL_IGNORE:
@@ -238,33 +242,54 @@ func ReserializeNotify(method string, data []byte) (param []byte, err error) {
 	return
 }
 
-func SerializeSynchron(i ruid.ID, components [][]byte) (data []byte) {
-	size := i.ByteSize()
+func ReserializeComponents(components [][]byte) (size int, cs []uint64, ds [][]byte, err error) {
 	for _, component := range components {
-		size += len(component)
-	}
-
-	data = make([]byte, size)
-	output := &tygo.ProtoBuf{Buffer: data}
-	i.Serialize(output)
-	for _, component := range components {
-		output.Write(component)
+		var name []byte
+		input := &tygo.ProtoBuf{Buffer: component}
+		if name, err = input.ReadBuf(); err != nil {
+			return
+		} else {
+			c := GATE_SYMDICT[string(name)]
+			d := input.Bytes()
+			cs = append(cs, c)
+			ds = append(ds, d)
+			size += tygo.SizeVarint(c) + len(d)
+		}
 	}
 	return
 }
 
-func SerializeHandshake(i ruid.ID, components [][]byte) (data []byte) {
-	size := len(HANDSHAKE_DATA) + i.ByteSize()
-	for _, component := range components {
-		size += len(component)
+func SerializeSynchron(i ruid.ID, components [][]byte) (data []byte, err error) {
+	size, cs, ds, err := ReserializeComponents(components)
+	if err != nil {
+		return
 	}
+	size += i.ByteSize()
+
+	data = make([]byte, size)
+	output := &tygo.ProtoBuf{Buffer: data}
+	i.Serialize(output)
+	for i, c := range cs {
+		output.WriteVarint(c)
+		output.Write(ds[i])
+	}
+	return
+}
+
+func SerializeHandshake(i ruid.ID, components [][]byte) (data []byte, err error) {
+	size, cs, ds, err := ReserializeComponents(components)
+	if err != nil {
+		return
+	}
+	size += len(HANDSHAKE_DATA) + i.ByteSize()
 
 	data = make([]byte, size)
 	output := &tygo.ProtoBuf{Buffer: data}
 	i.Serialize(output)
 	output.Write(HANDSHAKE_DATA)
-	for _, component := range components {
-		output.Write(component)
+	for i, c := range cs {
+		output.WriteVarint(c)
+		output.Write(ds[i])
 	}
 	return
 }
