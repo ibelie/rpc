@@ -356,7 +356,7 @@ ibelie.rpc.Connection.prototype.disconnect = function() {
 		JSID_READ[ident]("protobuf"), JSID_READ[ident]("protobuf"),
 		JSID_READ[ident]("protobuf"), JSID_READ[ident]("protobuf"),
 		JSID_BYTESIZE[ident]("this.ID"), JSID_BYTESIZE[ident]("this.Key"),
-		JSID_WRITE[ident]("protobuf", "this.ID"), JSID_WRITE[ident]("protobuf", "this.Key"),
+		JSID_WRITE[ident]("protobuf", "entity.ID"), JSID_WRITE[ident]("protobuf", "entity.Key"),
 		strings.Join(methods, ""))))
 
 	ioutil.WriteFile(path.Join(dir, "rpc.js"), buffer.Bytes(), 0666)
