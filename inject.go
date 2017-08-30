@@ -28,7 +28,7 @@ var (
 		"github.com/ibelie/ruid": "",
 		"github.com/ibelie/tygo": "",
 	}
-	PROP_PRE = []tygo.Type{tygo.SimpleType_STRING, tygo.SimpleType_STRING}
+	PROP_PRE = []tygo.Type{tygo.SimpleType_SYMBOL, tygo.SimpleType_SYMBOL}
 	DELEGATE = "Delegate"
 )
 
