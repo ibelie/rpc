@@ -383,17 +383,17 @@ func (s *_Server) Remove(key string) {
 func SerializeRequest(i ruid.ID, ss []string, m string, p []byte) (data []byte) {
 	var size int
 	for _, s := range ss {
-		size += tygo.SizeBuffer([]byte(s))
+		size += tygo.SizeSymbol(s)
 	}
 	data = make([]byte, i.ByteSize()+tygo.SizeVarint(uint64(size))+size+
-		tygo.SizeBuffer([]byte(m))+len(p))
+		tygo.SizeSymbol(m)+len(p))
 	output := &tygo.ProtoBuf{Buffer: data}
 	i.Serialize(output)
 	output.WriteVarint(uint64(size))
 	for _, s := range ss {
-		output.WriteBuf([]byte(s))
+		output.WriteSymbol(s)
 	}
-	output.WriteBuf([]byte(m))
+	output.WriteSymbol(m)
 	output.Write(p)
 	return
 }
@@ -405,15 +405,14 @@ func DeserializeRequest(data []byte) (i ruid.ID, ss []string, m string, p []byte
 	} else {
 		buffer := &tygo.ProtoBuf{Buffer: p}
 		for !buffer.ExpectEnd() {
-			if s, e := buffer.ReadBuf(); e != nil {
+			if s, e := buffer.ReadSymbol(); e != nil {
 				err = e
 				return
 			} else {
-				ss = append(ss, string(s))
+				ss = append(ss, s)
 			}
 		}
-		if p, err = input.ReadBuf(); err == nil {
-			m = string(p)
+		if m, err = input.ReadSymbol(); err == nil {
 			p = input.Bytes()
 		}
 	}

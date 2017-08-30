@@ -71,8 +71,7 @@ func (e *Entity) Client(session *Entity) *ClientDelegate {
 }
 
 func (e *Entity) Create() (err error) {
-	t := []byte(e.Type)
-	size := 1 + len(t)
+	size := 1 + tygo.SymbolEncodedLen(e.Type)
 	if e.Key.Nonzero() {
 		size += e.Key.ByteSize()
 	}
@@ -84,7 +83,7 @@ func (e *Entity) Create() (err error) {
 	} else {
 		output.WriteBytes(0)
 	}
-	output.Write(t)
+	output.EncodeSymbol(t)
 	_, err = Server.Distribute(e.ID, e.Key, e.Type, SYMBOL_CREATE, data)
 	return
 }
@@ -96,7 +95,7 @@ func (e *Entity) Destroy() (err error) {
 
 func (e *Entity) ByteSize() (size int) {
 	if e != nil {
-		size = 1 + len([]byte(e.Type))
+		size = 1 + tygo.SymbolEncodedLen(e.Type)
 		if e.ID.Nonzero() {
 			size += e.ID.ByteSize()
 		}
@@ -124,7 +123,7 @@ func (e *Entity) Serialize(output *tygo.ProtoBuf) {
 		if e.Key.Nonzero() {
 			e.Key.Serialize(output)
 		}
-		output.Write([]byte(e.Type))
+		output.EncodeSymbol(e.Type)
 	}
 }
 
@@ -143,7 +142,7 @@ func (e *Entity) Deserialize(input *tygo.ProtoBuf) (err error) {
 	} else if e.Key, err = Server.DeserializeID(input); err != nil {
 		return
 	}
-	e.Type = string(input.Bytes())
+	e.Type = tygo.DecodeSymbol(input.Bytes())
 	return
 }
 `

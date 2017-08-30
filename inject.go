@@ -224,7 +224,7 @@ func (s *%sServiceImpl) Procedure(i ruid.ID, m string, param []byte) (result []b
 			} else if k, err = Server.DeserializeID(input); err != nil {
 				return
 			}
-			s.services[i] = &%s{Entity: &Entity{ID: i, Key: k, Type: string(input.Bytes())}}%s
+			s.services[i] = &%s{Entity: &Entity{ID: i, Key: k, Type: tygo.DecodeSymbol(input.Bytes())}}%s
 		}
 	case SYMBOL_DESTROY:
 		s.mutex.Lock()
@@ -239,10 +239,9 @@ func (s *%sServiceImpl) Procedure(i ruid.ID, m string, param []byte) (result []b
 			err = fmt.Errorf("[%s] Service synchron - ID not exists: %%v", i)
 		} else {
 			size := service.ByteSize()
-			bytes := []byte(SYMBOL_%s)
-			result = make([]byte, tygo.SizeBuffer(bytes) + tygo.SizeVarint(uint64(size)) + size)
+			result = make([]byte, tygo.SizeSymbol(SYMBOL_%s) + tygo.SizeVarint(uint64(size)) + size)
 			output := &tygo.ProtoBuf{Buffer: result}
-			output.WriteBuf(bytes)
+			output.WriteSymbol(SYMBOL_%s)
 			output.WriteVarint(uint64(size))
 			service.Serialize(output)
 		}%s
@@ -251,7 +250,7 @@ func (s *%sServiceImpl) Procedure(i ruid.ID, m string, param []byte) (result []b
 }
 `, service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
 		service.Name, service.Name, service.Name, service.Name, service.Name, service.Name,
-		onCreate, serviceTemp, service.Name, onDestroy, service.Name, service.Name,
+		onCreate, serviceTemp, service.Name, onDestroy, service.Name, service.Name, service.Name,
 		strings.Join(cases, "")), pkgs
 }
 
