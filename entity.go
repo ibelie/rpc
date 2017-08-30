@@ -83,7 +83,7 @@ func (e *Entity) Create() (err error) {
 	} else {
 		output.WriteBytes(0)
 	}
-	output.EncodeSymbol(t)
+	output.EncodeSymbol(e.Type)
 	_, err = Server.Distribute(e.ID, e.Key, e.Type, SYMBOL_CREATE, data)
 	return
 }

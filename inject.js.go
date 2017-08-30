@@ -130,7 +130,7 @@ goog.provide('Entity');
 %s
 goog.require('tyts.ProtoBuf');
 goog.require('tyts.SizeVarint');
-goog.provide('tyts.SymbolEncodedLen');%s
+goog.require('tyts.SymbolEncodedLen');%s
 
 var ZERO_ID = %q;
 
