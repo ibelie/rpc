@@ -65,13 +65,28 @@ func (s *HubImpl) Procedure(i ruid.ID, m string, param []byte) (result []byte, e
 			return
 		}
 		var errors []string
+		gateGhosts := make(map[string][]ruid.ID)
 		for gate, observers := range gates {
 			if len(observers) <= 0 {
 				errors = append(errors, fmt.Sprintf("\n>>>> [Hub] Dispatch gate no observer %v %v", i, gate))
 				continue
 			}
-			if _, err = server.Request(gate, i, m, SerializeDispatch(observers, param), SYMBOL_GATE); err != nil {
-				errors = append(errors, fmt.Sprintf("\n>>>> gate: %v\n>>>> %v", gate, err))
+			var datas [][]byte
+			var ghosts []ruid.ID
+			if datas, err = server.Request(gate, i, m, SerializeDispatch(observers, param), SYMBOL_GATE); err != nil || len(datas) <= 0 {
+				errors = append(errors, fmt.Sprintf("\n>>>> gate request: %v\n>>>> %v", gate, err))
+			} else if ghosts, err = DeserializeGhosts(datas[0]); err != nil {
+				errors = append(errors, fmt.Sprintf("\n>>>> gate ghosts: %v\n>>>> %v", gate, err))
+			} else if len(ghosts) > 0 {
+				gateGhosts[gate] = ghosts
+			}
+		}
+		for gate, ghosts := range gateGhosts {
+			for _, ghost := range ghosts {
+				delete(gates[gate], ghost)
+			}
+			if len(gates[gate]) <= 0 {
+				delete(gates, gate)
 			}
 		}
 		if len(errors) > 0 {

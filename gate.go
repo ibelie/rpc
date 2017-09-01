@@ -163,16 +163,51 @@ func (s *GateImpl) Procedure(i ruid.ID, m string, param []byte) (result []byte, 
 	output.WriteVarint(uint64(len(param)))
 	output.Write(param)
 	var errors []string
+	var ghosts []ruid.ID
 	for _, observer := range observers {
 		if gate, ok := s.gates[observer]; !ok {
-			errors = append(errors, fmt.Sprintf("\n>>>> Dispatch gate not found %v", observer))
+			ghosts = append(ghosts, observer)
 		} else if err = gate.Send(data); err != nil {
 			errors = append(errors, fmt.Sprintf("\n>>>> gate: %v\n>>>> %v", gate, err))
 			break
 		}
 	}
+
 	if len(errors) > 0 {
 		err = fmt.Errorf("[Gate] Dispatch errors:\n>>>> %v", strings.Join(errors, ""))
+	}
+	result = SerializeGhosts(ghosts)
+	return
+}
+
+func SerializeGhosts(ghosts []ruid.ID) (data []byte) {
+	if len(ghosts) <= 0 {
+		return
+	}
+	var size int
+	for _, ghost := range ghosts {
+		size += ghost.ByteSize()
+	}
+	data = make([]byte, size)
+	output := &tygo.ProtoBuf{Buffer: data}
+	for _, ghost := range ghosts {
+		ghost.Serialize(output)
+	}
+	return
+}
+
+func DeserializeGhosts(data []byte) (ghosts []ruid.ID, err error) {
+	if len(data) <= 0 {
+		return
+	}
+	var ghost ruid.ID
+	input := &tygo.ProtoBuf{Buffer: data}
+	for !input.ExpectEnd() {
+		if ghost, err = server.DeserializeID(input); err != nil {
+			return
+		} else {
+			ghosts = append(ghosts, ghost)
+		}
 	}
 	return
 }
