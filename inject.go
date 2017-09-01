@@ -34,7 +34,7 @@ var (
 
 func ReplaceEntity(dir string, filename string, pkgname string, types []tygo.Type, _ []tygo.Type, _ string) {
 	for _, t := range types {
-		if object, ok := isService(t); ok {
+		if object, ok := isComponent(t); ok {
 			object.Parent.Object = &tygo.Object{
 				Name:   "Entity",
 				Parent: &tygo.InstanceType{PkgName: "tygo", PkgPath: tygo.TYGO_PATH, Name: "Tygo"},
@@ -47,7 +47,7 @@ func Inject(dir string, filename string, pkgname string, types []tygo.Type, _ []
 	ReplaceEntity(dir, filename, pkgname, types, nil, "")
 	var services []*tygo.Object
 	for _, t := range types {
-		if object, ok := isService(t); ok {
+		if object, ok := isComponent(t); ok {
 			services = append(services, object)
 		}
 	}

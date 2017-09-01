@@ -164,7 +164,7 @@ package %s
 
 	var services []*tygo.Object
 	for _, t := range types {
-		if object, ok := isService(t); ok {
+		if object, ok := isComponent(t); ok {
 			services = append(services, object)
 		}
 	}
@@ -172,7 +172,7 @@ package %s
 	for _, depend := range depends {
 		for _, t := range tygo.Extract(depend.Path, nil) {
 			for _, s := range depend.Services {
-				if object, ok := isService(t); ok && s == object.Name {
+				if object, ok := isComponent(t); ok && s == object.Name {
 					var methods []string
 					services = append(services, object)
 					for _, method := range object.Methods {
@@ -298,8 +298,10 @@ func entityRoutes(entities []*Entity) string {
 			for _, m := range c.Methods {
 				cMethods[m] = true
 			}
-			components = append(components, fmt.Sprintf(`
+			if c.isService() {
+				components = append(components, fmt.Sprintf(`
 		SYMBOL_%s: true,`, c.Name))
+			}
 			componentMap[c.Name] = c
 		}
 

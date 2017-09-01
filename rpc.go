@@ -132,7 +132,7 @@ func update(a map[string]string, b map[string]string) map[string]string {
 	return a
 }
 
-func isService(t tygo.Type) (*tygo.Object, bool) {
+func isComponent(t tygo.Type) (*tygo.Object, bool) {
 	object, ok := t.(*tygo.Object)
 	return object, ok && object.Parent.Name == "Entity"
 }
@@ -140,6 +140,20 @@ func isService(t tygo.Type) (*tygo.Object, bool) {
 func hasMethod(object *doc.Type, method *tygo.Method) bool {
 	for _, m := range object.Methods {
 		if m.Name == method.Name {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Component) isService() bool {
+	if hasMethod(c.Service, &tygo.Method{Name: "onCreate"}) {
+		return true
+	} else if hasMethod(c.Service, &tygo.Method{Name: "onDestroy"}) {
+		return true
+	}
+	for _, m := range c.Protocol.Methods {
+		if hasMethod(c.Service, m) {
 			return true
 		}
 	}
