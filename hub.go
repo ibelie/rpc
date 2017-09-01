@@ -6,6 +6,7 @@ package rpc
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 
@@ -61,14 +62,14 @@ func (s *HubImpl) Procedure(i ruid.ID, m string, param []byte) (result []byte, e
 	default:
 		gates, ok := s.observers[i]
 		if !ok || len(gates) <= 0 {
-			err = fmt.Errorf("[Hub] Dispatch no gate found %v %v", i, gates)
+			log.Printf("[Hub@%v] Dispatch %q no observer for %v", server.Addr, m, i)
 			return
 		}
 		var errors []string
 		gateGhosts := make(map[string][]ruid.ID)
 		for gate, observers := range gates {
 			if len(observers) <= 0 {
-				errors = append(errors, fmt.Sprintf("\n>>>> [Hub] Dispatch gate no observer %v %v", i, gate))
+				gateGhosts[gate] = nil
 				continue
 			}
 			var datas [][]byte
