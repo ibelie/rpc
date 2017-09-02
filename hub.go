@@ -98,10 +98,13 @@ func (s *HubImpl) Procedure(i ruid.ID, m string, param []byte) (result []byte, e
 }
 
 func DeserializeSessionGate(data []byte) (session ruid.ID, gate string, err error) {
-	if session, err = server.DeserializeID(&tygo.ProtoBuf{Buffer: data}); err != nil {
+	var gateID ruid.ID
+	input := &tygo.ProtoBuf{Buffer: data}
+	if session, err = server.DeserializeID(input); err != nil {
+	} else if gateID, err = server.DeserializeID(input); err != nil {
 	} else if ring, ok := server.remote[SYMBOL_GATE]; !ok {
 		err = fmt.Errorf("Cannot find gate service: %v %v %v", server.remote, server.Node, server.nodes)
-	} else if gate, ok = ring.Get(session); !ok {
+	} else if gate, ok = ring.Get(gateID); !ok {
 		err = fmt.Errorf("No gate found: %v %v", server.Node, server.nodes)
 	}
 	return

@@ -64,8 +64,11 @@ func Gate(address string, session string, symbols []string, network Network) {
 
 func (s *GateImpl) handler(gate Connection) {
 	session := server.Ident.New()
-	SESSION_BYTES := make([]byte, session.ByteSize())
-	session.Serialize(&tygo.ProtoBuf{Buffer: SESSION_BYTES})
+	serverID := server.ServerID()
+	SESSION_BYTES := make([]byte, session.ByteSize()+serverID.ByteSize())
+	sessionOutput := &tygo.ProtoBuf{Buffer: SESSION_BYTES}
+	session.Serialize(sessionOutput)
+	serverID.Serialize(sessionOutput)
 
 	if _, err := server.Distribute(session, server.ServerID(), SYMBOL_SESSION, SYMBOL_CREATE, CREATE_SESSION); err != nil {
 		log.Printf("[Gate@%v] Create session error %v %v:\n>>>> %v", server.Addr, gate.Address(), session, err)
