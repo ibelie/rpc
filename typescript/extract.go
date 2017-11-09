@@ -51,7 +51,7 @@ type PackageStr struct {
 func Extract(file string) (pkg *PackageStr) {
 	output, err := exec.Command("node", JS_PATH, file).CombinedOutput()
 	if err != nil {
-		log.Fatalf("[Typescript] Cannot extract: %s\n>>>> %v", string(output))
+		log.Fatalf("[Typescript] Cannot extract: %s\n>>>> %v", string(output), err)
 	} else if err = json.Unmarshal(output, &pkg); err != nil {
 		log.Fatalf("[Typescript] Cannot unmarshal objects:\n>>>> %v", err)
 	}
