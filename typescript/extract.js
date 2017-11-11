@@ -74,7 +74,7 @@ function Extract(fileNames, options) {
 	}
 
 	function isNodeExported(node) {
-		return (node.flags & ts.NodeFlags.Export) !== 0 || (node.parent && node.parent.kind === ts.SyntaxKind.SourceFile);
+		return (ts.getCombinedModifierFlags(node) & ts.ModifierFlags.Export) !== 0 || (!!node.parent && node.parent.kind === ts.SyntaxKind.SourceFile);
 	}
 
 	function type(t, d) {
