@@ -23,11 +23,9 @@ function Extract(fileNames, options) {
 		var exported = isNodeExported(node);
 		if (exported && ts.isClassDeclaration(node) && node.name) {
 			pkg.Objects.push(processObject(node));
-		}
-		else if (exported && ts.isModuleDeclaration(node)) {
+		} else if (exported && ts.isModuleDeclaration(node)) {
 			ts.forEachChild(node, visit);
-		}
-		else if (ts.isModuleBlock(node)) {
+		} else if (ts.isModuleBlock(node)) {
 			ts.forEachChild(node, visit);
 		}
 	}
@@ -61,8 +59,7 @@ function Extract(fileNames, options) {
 					method.Result = result;
 				}
 				object.Methods.push(method);
-			}
-			else {
+			} else {
 				object.Fields.push({
 					Name: m,
 					Type: type(t, s.valueDeclaration),
@@ -80,17 +77,13 @@ function Extract(fileNames, options) {
 	function type(t, d) {
 		if (t.flags & ts.TypeFlags.StringLike) {
 			return { Simple: checker.typeToString(t, d) };
-		}
-		else if (checker.typeToString(t).substr(checker.typeToString(t).length - 2) == "[]") {
+		} else if (checker.typeToString(t).substr(checker.typeToString(t).length - 2) == "[]") {
 			return { List: type(checker.getIndexTypeOfType(t, ts.IndexKind.Number)) };
-		}
-		else if (checker.getIndexTypeOfType(t, ts.IndexKind.Number)) {
+		} else if (checker.getIndexTypeOfType(t, ts.IndexKind.Number)) {
 			return { Key: { Simple: "number" }, Value: type(checker.getIndexTypeOfType(t, ts.IndexKind.Number)) };
-		}
-		else if (checker.getIndexTypeOfType(t, ts.IndexKind.String)) {
+		} else if (checker.getIndexTypeOfType(t, ts.IndexKind.String)) {
 			return { Key: { Simple: "string" }, Value: type(checker.getIndexTypeOfType(t, ts.IndexKind.String)) };
-		}
-		else {
+		} else {
 			return { Simple: checker.typeToString(t, d) };
 		}
 	}
