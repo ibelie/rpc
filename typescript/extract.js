@@ -21,13 +21,13 @@ function Extract(fileNames, options) {
 
 	function visit(node) {
 		var exported = isNodeExported(node);
-		if (exported && node.kind === ts.SyntaxKind.ClassDeclaration) {
+		if (exported && ts.isClassDeclaration(node) && node.name) {
 			pkg.Objects.push(processObject(node));
 		}
-		else if (exported && node.kind === ts.SyntaxKind.ModuleDeclaration) {
+		else if (exported && ts.isModuleDeclaration(node)) {
 			ts.forEachChild(node, visit);
 		}
-		else if (node.kind === ts.SyntaxKind.ModuleBlock) {
+		else if (ts.isModuleBlock(node)) {
 			ts.forEachChild(node, visit);
 		}
 	}
