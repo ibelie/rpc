@@ -45,14 +45,13 @@ function Extract(fileNames, options) {
 				}
 			}
 		}
-		for (var m in symbol.members) {
-			var s = symbol.members[m];
-			var t = checker.getTypeOfSymbolAtLocation(s, s.valueDeclaration);
+		symbol.members.forEach((v, k, _) => {
+			var t = checker.getTypeOfSymbolAtLocation(v, v.valueDeclaration);
 			if (t.getCallSignatures() && t.getCallSignatures().length > 0) {
 				var method = {
-					Name: m,
+					Name: k,
 					Params: t.getCallSignatures()[0].parameters.map(function (x) { return type(checker.getTypeOfSymbolAtLocation(x, x.valueDeclaration), x.valueDeclaration); }),
-					Document: ts.displayPartsToString(s.getDocumentationComment())
+					Document: ts.displayPartsToString(v.getDocumentationComment())
 				};
 				var result = type(t.getCallSignatures()[0].getReturnType());
 				if (result.Simple != "void") {
@@ -61,12 +60,12 @@ function Extract(fileNames, options) {
 				object.Methods.push(method);
 			} else {
 				object.Fields.push({
-					Name: m,
-					Type: type(t, s.valueDeclaration),
-					Document: ts.displayPartsToString(s.getDocumentationComment())
+					Name: k,
+					Type: type(t, v.valueDeclaration),
+					Document: ts.displayPartsToString(v.getDocumentationComment())
 				});
 			}
-		}
+		});
 		return object;
 	}
 
@@ -75,7 +74,7 @@ function Extract(fileNames, options) {
 	}
 
 	function type(t, d) {
-		if (t.flags & ts.TypeFlags.StringLike) {
+		if (ts.getCombinedModifierFlags(t) & ts.TypeFlags.StringLike !== 0) {
 			return { Simple: checker.typeToString(t, d) };
 		} else if (checker.typeToString(t).substr(checker.typeToString(t).length - 2) == "[]") {
 			return { List: type(checker.getIndexTypeOfType(t, ts.IndexKind.Number)) };
