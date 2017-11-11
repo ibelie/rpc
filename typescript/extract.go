@@ -17,10 +17,11 @@ import (
 var JS_PATH = path.Join(os.Getenv("GOPATH"), "src", reflect.TypeOf(PackageStr{}).PkgPath(), "extract.js")
 
 type TypeStr struct {
-	Simple string
-	List   *TypeStr
-	Key    *TypeStr
-	Value  *TypeStr
+	Simple  string
+	Variant []*TypeStr
+	List    *TypeStr
+	Key     *TypeStr
+	Value   *TypeStr
 }
 
 type FieldStr struct {

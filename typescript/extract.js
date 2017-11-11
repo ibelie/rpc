@@ -74,16 +74,23 @@ function Extract(fileNames, options) {
 	}
 
 	function type(t, d) {
-		if (ts.getCombinedModifierFlags(t) & ts.TypeFlags.StringLike !== 0) {
-			return { Simple: checker.typeToString(t, d) };
-		} else if (checker.typeToString(t).substr(checker.typeToString(t).length - 2) == "[]") {
+		var s = checker.typeToString(t, d);
+		if (t.types) {
+			var types = [];
+			for (var typ of t.types) {
+				types.push(type(typ));
+			}
+			return { Variant: types };
+		} else if (s == 'string') {
+			return { Simple: s };
+		} else if (s.substr(s.length - 2) == "[]") {
 			return { List: type(checker.getIndexTypeOfType(t, ts.IndexKind.Number)) };
 		} else if (checker.getIndexTypeOfType(t, ts.IndexKind.Number)) {
 			return { Key: { Simple: "number" }, Value: type(checker.getIndexTypeOfType(t, ts.IndexKind.Number)) };
 		} else if (checker.getIndexTypeOfType(t, ts.IndexKind.String)) {
 			return { Key: { Simple: "string" }, Value: type(checker.getIndexTypeOfType(t, ts.IndexKind.String)) };
 		} else {
-			return { Simple: checker.typeToString(t, d) };
+			return { Simple: s };
 		}
 	}
 }
