@@ -27,7 +27,7 @@ var JSID_REQUIRE = []string{
 	"",
 	"",
 	`
-	goog.require('tyts.String');`,
+	goog.require('ibelie.tyts.String');`,
 }
 
 var JSID_BYTESIZE = []func(string) string{
@@ -38,7 +38,7 @@ var JSID_BYTESIZE = []func(string) string{
 		return fmt.Sprintf("16")
 	},
 	func(value string) string {
-		return fmt.Sprintf("tyts.String.ByteSize(%s, 0, false)", value)
+		return fmt.Sprintf("ibelie.tyts.String.ByteSize(%s, 0, false)", value)
 	},
 }
 
@@ -50,7 +50,7 @@ var JSID_WRITE = []func(string, string) string{
 		return fmt.Sprintf("%s.WriteBase64(%s)", protobuf, value)
 	},
 	func(protobuf string, value string) string {
-		return fmt.Sprintf("tyts.String.Serialize(%s, 0, false, %s)", value, protobuf)
+		return fmt.Sprintf("ibelie.tyts.String.Serialize(%s, 0, false, %s)", value, protobuf)
 	},
 }
 
@@ -62,7 +62,7 @@ var JSID_READ = []func(string) string{
 		return fmt.Sprintf("%s.ReadBase64(16)", protobuf)
 	},
 	func(protobuf string) string {
-		return fmt.Sprintf("tyts.String.Deserialize(null, %s)", protobuf)
+		return fmt.Sprintf("ibelie.tyts.String.Deserialize(null, %s)", protobuf)
 	},
 }
 
@@ -128,9 +128,9 @@ goog.require('ibelie.rpc.%s');`, c.Name)] = true
 
 goog.provide('Entity');
 %s
-goog.require('tyts.ProtoBuf');
-goog.require('tyts.SizeVarint');
-goog.require('tyts.SymbolEncodedLen');%s
+goog.require('ibelie.tyts.ProtoBuf');
+goog.require('ibelie.tyts.SizeVarint');
+goog.require('ibelie.tyts.SymbolEncodedLen');%s
 
 var ZERO_ID = %q;
 
@@ -143,7 +143,7 @@ Entity = function() {
 };
 
 Entity.prototype.ByteSize = function() {
-	var size = 1 + tyts.SymbolEncodedLen(this.Type);
+	var size = 1 + ibelie.tyts.SymbolEncodedLen(this.Type);
 	if (this.ID != ZERO_ID) {
 		size += %s;
 	}
@@ -154,7 +154,7 @@ Entity.prototype.ByteSize = function() {
 };
 
 Entity.prototype.Serialize = function() {
-	var protobuf = new tyts.ProtoBuf(new Uint8Array(this.ByteSize()));
+	var protobuf = new ibelie.tyts.ProtoBuf(new Uint8Array(this.ByteSize()));
 	var t = 0;
 	if (this.ID != ZERO_ID) {
 		t |= 1;
@@ -174,7 +174,7 @@ Entity.prototype.Serialize = function() {
 };
 
 Entity.prototype.Deserialize = function(data) {
-	var protobuf = new tyts.ProtoBuf(data);
+	var protobuf = new ibelie.tyts.ProtoBuf(data);
 	var t = protobuf.ReadByte();
 	this.ID = (t & 1) ? %s : ZERO_ID;
 	this.Key = (t & 2) ? %s : ZERO_ID;
@@ -241,12 +241,12 @@ ibelie.rpc.Connection = function(url) {
 	socket.onopen = function (event) {
 		socket.onmessage = function(event) {
 			var entity;
-			var protobuf = tyts.ProtoBuf.FromBase64(event.data);
+			var protobuf = ibelie.tyts.ProtoBuf.FromBase64(event.data);
 			var id = %s;
 			if (!conn.Symbols) {
 				conn.Symbols = [];
 				conn.SymDict = {};
-				var buffer = new tyts.ProtoBuf(protobuf.ReadBuffer());
+				var buffer = new ibelie.tyts.ProtoBuf(protobuf.ReadBuffer());
 				var value = 0;
 				while (!buffer.End()) {
 					var symbol = buffer.ReadSymbol();
@@ -278,7 +278,7 @@ ibelie.rpc.Connection = function(url) {
 					console.error('[Connection] Entity is not awake:', id, name, entity);
 					continue;
 				} else if (name == 'NOTIFY') {
-					var buffer = new tyts.ProtoBuf(data);
+					var buffer = new ibelie.tyts.ProtoBuf(data);
 					var compName = conn.Symbols[buffer.ReadVarint()];
 					var property = conn.Symbols[buffer.ReadVarint()];
 					var newValue = ibelie.rpc[compName]['Deserialize' + property](buffer.Bytes())[0];
@@ -328,7 +328,7 @@ ibelie.rpc.Connection = function(url) {
 
 ibelie.rpc.Connection.prototype.send = function(entity, method, data) {
 	var t = this.SymDict[entity.Type] << 2;
-	var size = tyts.SizeVarint(t) + tyts.SizeVarint(method);
+	var size = ibelie.tyts.SizeVarint(t) + ibelie.tyts.SizeVarint(method);
 	if (entity.ID != ZERO_ID) {
 		size += %s;
 		t |= 1;
@@ -340,7 +340,7 @@ ibelie.rpc.Connection.prototype.send = function(entity, method, data) {
 	if (data) {
 		size += data.length;
 	}
-	var protobuf = new tyts.ProtoBuf(new Uint8Array(size));
+	var protobuf = new ibelie.tyts.ProtoBuf(new Uint8Array(size));
 	protobuf.WriteVarint(t);
 	if (entity.ID != ZERO_ID) {
 		%s;
