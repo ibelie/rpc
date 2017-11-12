@@ -86,15 +86,15 @@ declare module ibelie.rpc {
 	interface Entity {
 		__class__: string;
 		isAwake: boolean;
+		Awake(entity: Entity): any;
+		Drop(entity: Entity): any;
 		ByteSize(): number;
 		Serialize(): Uint8Array;
 		Deserialize(data: Uint8Array): void;%s
 	}
 
-	class Component {
+	interface Component {
 		Entity: Entity;
-		Awake(entity: Entity): any;
-		Drop(entity: Entity): any;
 	}
 
 	class Connection {
