@@ -90,8 +90,8 @@ func injectJavascript(identName string, dir string, entities []*Entity) {
 				}
 				localParams := append([]string{"v"}, params...)
 				methods = append(methods, fmt.Sprintf(`
-Entity.prototype.Deserialize%s = function(data) {
-	return ibelie.rpc.%s.Deserialize%sParam(data);
+Entity.prototype['D_%s'] = function(data) {
+	return ibelie.rpc['%s']['D_%sParam'](data);
 };
 
 Entity.prototype.%s = function(%s) {
@@ -103,7 +103,7 @@ Entity.prototype.%s = function(%s) {
 		var v = this[k];
 		v.%s && v.%s.call(%s);
 	}
-	var data = ibelie.rpc.%s.Serialize%sParam(%s);
+	var data = ibelie.rpc['%s']['S_%sParam'](%s);
 	this.connection.send(this, this.connection.SymDict.%s, data);
 };
 `, m.Name, c.Name, m.Name, m.Name, strings.Join(params, ", "),
@@ -281,7 +281,7 @@ ibelie.rpc.Connection = function(url) {
 					var buffer = new ibelie.tyts.ProtoBuf(data);
 					var compName = conn.Symbols[buffer.ReadVarint()];
 					var property = conn.Symbols[buffer.ReadVarint()];
-					var newValue = ibelie.rpc[compName]['Deserialize' + property](buffer.Bytes())[0];
+					var newValue = ibelie.rpc[compName]['D_' + property](buffer.Bytes())[0];
 					var component = entity[compName];
 					var oldValue = component[property];
 					var handler = component[property + 'Handler'];
@@ -303,7 +303,7 @@ ibelie.rpc.Connection = function(url) {
 						handler && handler.call(component, oldValue, newValue);
 					}
 				} else {
-					var args = entity['Deserialize' + name](data);
+					var args = entity['D_' + name](data);
 					for (var k in entity) {
 						var v = entity[k];
 						v[name] && v[name].apply(v, args);
