@@ -40,8 +40,15 @@ type Component struct {
 	Service  *doc.Type
 }
 
+type Behavior struct {
+	Name       string
+	Methods    []string
+	Components []*Component
+}
+
 type Entity struct {
 	Name       string
+	Behavior   []*Behavior
 	Components []*Component
 }
 
