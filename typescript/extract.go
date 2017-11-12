@@ -39,6 +39,7 @@ type MethodStr struct {
 
 type ObjectStr struct {
 	Name    string
+	Module  string
 	Parents []*TypeStr
 	Fields  []*FieldStr
 	Methods []*MethodStr

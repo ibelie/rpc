@@ -19,23 +19,26 @@ function Extract(fileNames, options) {
 	console.info(JSON.stringify(pkg, undefined, 4));
 	return;
 
-	function visit(node) {
+	function visit(node, mod) {
 		var exported = isNodeExported(node);
-		if (exported && ts.isClassDeclaration(node) && node.name) {
-			pkg.Objects.push(processObject(node));
-		} else if (ts.isInterfaceDeclaration(node) && node.name && node.heritageClauses) {
-			pkg.Objects.push(processObject(node));
+		if (exported && mod && ts.isClassDeclaration(node) && node.name) {
+			pkg.Objects.push(processObject(node, mod));
+		} else if (mod && ts.isInterfaceDeclaration(node) && node.name && node.heritageClauses) {
+			pkg.Objects.push(processObject(node, mod));
 		} else if (exported && ts.isModuleDeclaration(node)) {
-			ts.forEachChild(node, visit);
+			var m = checker.getSymbolAtLocation(node.name).getName();
+			mod = mod ? mod + '.' + m : m;
+			ts.forEachChild(node, (node) => { visit(node, mod); });
 		} else if (ts.isModuleBlock(node)) {
-			ts.forEachChild(node, visit);
+			ts.forEachChild(node, (node) => { visit(node, mod); });
 		}
 	}
 
-	function processObject(node) {
+	function processObject(node, mod) {
 		var symbol = checker.getSymbolAtLocation(node.name);
 		var object = {
 			Name: symbol.getName(),
+			Module: mod,
 			Parents: [],
 			Fields:  [],
 			Methods: []
