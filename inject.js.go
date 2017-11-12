@@ -202,7 +202,7 @@ ibelie.rpc.Component.prototype.Awake = function(e) {
 	if (entity) {
 		return entity
 	}
-	entity = new entities[e.Type]();
+	entity = new ibelie.rpc.entities[e.Type]();
 	entity.ID = e.ID;
 	entity.Key = e.Key;
 	entity.Type = e.Type;
@@ -256,7 +256,7 @@ ibelie.rpc.Connection = function(url) {
 				}
 				var key = %s;
 				var t = conn.Symbols[protobuf.ReadVarint()];
-				entity = new entities[t]();
+				entity = new ibelie.rpc.entities[t]();
 				entity.connection = conn;
 				entity.ID = id;
 				entity.Key = key;

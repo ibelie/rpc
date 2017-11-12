@@ -23,6 +23,8 @@ function Extract(fileNames, options) {
 		var exported = isNodeExported(node);
 		if (exported && ts.isClassDeclaration(node) && node.name) {
 			pkg.Objects.push(processObject(node));
+		} else if (exported && ts.isInterfaceDeclaration(node) && node.name && node.heritageClauses) {
+			pkg.Objects.push(processObject(node));
 		} else if (exported && ts.isModuleDeclaration(node)) {
 			ts.forEachChild(node, visit);
 		} else if (ts.isModuleBlock(node)) {

@@ -49,8 +49,8 @@ type PackageStr struct {
 	Objects []*ObjectStr
 }
 
-func Extract(file string) (pkg *PackageStr) {
-	output, err := exec.Command("node", JS_PATH, file).CombinedOutput()
+func Extract(files []string) (pkg *PackageStr) {
+	output, err := exec.Command("node", append([]string{JS_PATH}, files...)...).CombinedOutput()
 	if err != nil {
 		log.Fatalf("[Typescript] Cannot extract: %s\n>>>> %v", string(output), err)
 	} else if err = json.Unmarshal(output, &pkg); err != nil {

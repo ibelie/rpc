@@ -6,15 +6,15 @@ package main
 
 import (
 	"flag"
+
 	"github.com/ibelie/rpc"
 )
 
 func main() {
 	ident := flag.String("id", "", "identifier type")
-	input := flag.String("in", "", "input entities.ts")
 	tsOut := flag.String("ts", "", "output typescript dir")
 	goOut := flag.String("go", "", "output golang dir")
 	flag.Parse()
-	entities := rpc.Typescript(*ident, *input, *tsOut)
+	entities := rpc.Typescript(*ident, *tsOut, flag.Args())
 	rpc.Proxy(*ident, *goOut, entities)
 }
