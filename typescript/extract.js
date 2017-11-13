@@ -79,7 +79,7 @@ function Extract(fileNames, options) {
 	}
 
 	function type(t, d) {
-		var s = checker.typeToString(t, d);
+		var s = d ? d.type.getText() : checker.typeToString(t);
 		if (t.types) {
 			var types = [];
 			for (var typ of t.types) {
