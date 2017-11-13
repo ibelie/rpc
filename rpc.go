@@ -35,7 +35,6 @@ type Depend struct {
 type Component struct {
 	Name     string
 	Path     string
-	Methods  []string
 	Protocol *tygo.Object
 	Service  *doc.Type
 }

@@ -24,9 +24,9 @@ func Python(identName string, input string, pyOut string, ignore []string) (enti
 	components := make(map[string]*Component)
 	for n, c := range pkg.Components {
 		components[n] = &Component{
-			Name:    c.Name,
-			Path:    c.Package,
-			Methods: c.Messages,
+			Name: c.Name,
+			Path: c.Package,
+			// Methods: c.Messages,
 		}
 	}
 	for _, e := range pkg.Entities {

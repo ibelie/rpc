@@ -18,30 +18,81 @@ import (
 
 func Typescript(identName string, tsOut string, inputs []string) (entities []*Entity) {
 	pkg := typescript.Extract(inputs)
+
 	components := make(map[string]*Component)
 	for _, o := range pkg.Objects {
 		if len(o.Parents) != 1 || o.Parents[0] == nil || o.Parents[0].Simple != "ibelie.rpc.Component" {
 			continue
 		}
-		component := &Component{Name: o.Name}
-		for _, m := range o.Methods {
-			component.Methods = append(component.Methods, m.Name)
-		}
-		components[component.Name] = component
+		components[o.Name] = &Component{Name: o.Name}
 	}
+
+	behaviors := make(map[string]*Behavior)
+	for _, o := range pkg.Objects {
+		if len(o.Parents) != 1 || o.Parents[0] == nil || o.Parents[0].Simple != "ibelie.rpc.Behavior" {
+			continue
+		}
+
+		behavior := &Behavior{Name: o.Name}
+		for _, f := range o.Fields {
+			if f.Type == nil || !strings.HasSuffix(f.Type.Simple, "."+f.Name) {
+				continue
+			}
+
+			component, ok := components[f.Name]
+			if !ok {
+				component = &Component{Name: f.Name}
+				components[f.Name] = component
+			}
+			component.Path = strings.Replace(f.Type.Simple[:len(f.Type.Simple)-len(f.Name)-1], ".", "/", -1)
+			behavior.Components = append(behavior.Components, component)
+		}
+
+		for _, m := range o.Methods {
+			behavior.Methods = append(behavior.Methods, m.Name)
+		}
+
+		behaviors[behavior.Name] = behavior
+	}
+
 	for _, o := range pkg.Objects {
 		if len(o.Parents) != 1 || o.Parents[0] == nil || o.Parents[0].Simple != "ibelie.rpc.Entity" {
 			continue
 		}
+
 		entity := &Entity{Name: o.Name}
 		for _, f := range o.Fields {
 			if f.Type == nil || !strings.HasSuffix(f.Type.Simple, "."+f.Name) {
 				continue
-			} else if component, ok := components[f.Name]; ok {
-				component.Path = strings.Replace(f.Type.Simple[:len(f.Type.Simple)-len(f.Name)-1], ".", "/", -1)
-				entity.Components = append(entity.Components, component)
+			}
+
+			component, ok := components[f.Name]
+			if !ok {
+				component = &Component{Name: f.Name}
+				components[f.Name] = component
+			}
+			component.Path = strings.Replace(f.Type.Simple[:len(f.Type.Simple)-len(f.Name)-1], ".", "/", -1)
+			entity.Components = append(entity.Components, component)
+		}
+
+		for _, b := range behaviors {
+			hasBehavior := true
+			for _, bc := range b.Components {
+				for _, ec := range entity.Components {
+					if bc != ec {
+						hasBehavior = false
+						break
+					}
+				}
+				if !hasBehavior {
+					break
+				}
+			}
+			if hasBehavior {
+				entity.Behavior = append(entity.Behavior, b)
 			}
 		}
+
 		entities = append(entities, entity)
 	}
 
@@ -86,14 +137,15 @@ declare module ibelie.rpc {
 	interface Entity {
 		__class__: string;
 		isAwake: boolean;
-		Awake(entity: Entity): any;
-		Drop(entity: Entity): any;
 		ByteSize(): number;
 		Serialize(): Uint8Array;
 		Deserialize(data: Uint8Array): void;%s
 	}
 
-	interface Tuple extends Entity {}
+	interface Behavior {
+		Awake(entity: Entity): any;
+		Drop(entity: Entity): any;
+	}
 
 	interface Component {
 		Entity: Entity;

@@ -286,7 +286,6 @@ func entityRoutes(entities []*Entity) string {
 	componentMap := make(map[string]*Component)
 	for _, e := range entities {
 		var components []string
-		cMethods := make(map[string]bool)
 		pMethods := make(map[string]bool)
 		for _, c := range e.Components {
 			if c.Protocol == nil {
@@ -295,9 +294,6 @@ func entityRoutes(entities []*Entity) string {
 			for _, m := range c.Protocol.Methods {
 				pMethods[m.Name] = true
 			}
-			for _, m := range c.Methods {
-				cMethods[m] = true
-			}
 			if c.isService() {
 				components = append(components, fmt.Sprintf(`
 		SYMBOL_%s: true,`, c.Name))
@@ -305,9 +301,16 @@ func entityRoutes(entities []*Entity) string {
 			componentMap[c.Name] = c
 		}
 
+		bMethods := make(map[string]bool)
+		for _, b := range e.Behavior {
+			for _, m := range b.Methods {
+				bMethods[m] = true
+			}
+		}
+
 		for m, ok := range pMethods {
 			if ok {
-				if ok, exist := cMethods[m]; ok && exist {
+				if ok, exist := bMethods[m]; ok && exist {
 					methodMap[m] = append(methodMap[m], fmt.Sprintf(CLIENT_ENTITY_FMT, e.Name))
 				}
 			}
