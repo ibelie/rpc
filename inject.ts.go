@@ -93,6 +93,8 @@ declare module ibelie.rpc {
 		Deserialize(data: Uint8Array): void;%s
 	}
 
+	interface Tuple extends Entity {}
+
 	interface Component {
 		Entity: Entity;
 	}
