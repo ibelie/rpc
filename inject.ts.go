@@ -153,10 +153,6 @@ declare module ibelie.rpc {
 
 	interface Behavior extends Entity {}
 
-	interface Component {
-		Entity: Entity;
-	}
-
 	class Connection {
 		socket: WebSocket;
 		entities: {[index: string]: Entity};
