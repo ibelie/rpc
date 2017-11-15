@@ -131,9 +131,11 @@ ibelie.rpc.Entity.prototype.%s = function(%s) {
 		console.warn('[Entity] Not awake:', this);
 		return;
 	}
-	for (var b of this.Behaviors) {
-		var m = b['%s'];
-		m && m(%s);
+	var funcs = this.Functions['%s'];
+	if (funcs && funcs.length > 0) {
+		for (var i = 0, n = funcs.length; i < n; i++) {
+			funcs[i](%s);
+		}
 	}
 	var data = %s.%s['S_%sParam'](%s);
 	this.connection.send(this, this.connection.SymDict['%s'], data);
@@ -163,9 +165,12 @@ ibelie.rpc.Entity.prototype.%s = function() {
 		return;
 	}
 	var args = Array.prototype.concat.apply([this], arguments);
-	for (var b of this.Behaviors) {
-		var m = b['%s'];
-		m && m.apply(b, args);
+	var funcs = this.Functions['%s'];
+	if (funcs && funcs.length > 0) {
+		for (var i = 0, n = funcs.length; i < n; i++) {
+			var func = funcs[i];
+			func.apply(func, args);
+		}
 	}
 };
 `, m, m))
@@ -188,10 +193,11 @@ goog.require('%s');`, behaviorModule)] = true
 		}
 		%s.prototype.Behaviors = [%s
 		];
+		%s.prototype.Functions = __functionMap(%s.prototype.Behaviors);
 		__reflect(%s.prototype, '%s');
 		return %s;
 	}(ibelie.rpc.Entity)),`, e.Name, e.Name, e.Name, strings.Join(components, ""),
-			e.Name, strings.Join(entBehaviors, ""), e.Name, e.Name, e.Name))
+			e.Name, strings.Join(entBehaviors, ""), e.Name, e.Name, e.Name, e.Name, e.Name))
 	}
 
 	for _, b := range behaviors {
@@ -227,6 +233,30 @@ var __extends = (this && this.__extends) || function (d, b) {
 	for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
 	function __() { this.constructor = d; }
 	d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+};
+
+var __functionMap = (this && this.__functionMap) || function (behaviors) {
+	function _funcMap(m, o) {
+		for (var k in o) {
+			var v = o[k];
+			if (v instanceof Function) {
+				if (!m[k]) {
+					m[k] = [];
+				}
+				m[k].push(v);
+			} else {
+				if (!m[k]) {
+					m[k] = {};
+				}
+				_funcMap(m[k], v);
+			}
+		}
+	}
+	var map = {};
+	for (var i = 0, n = behaviors.length; i < n; i++) {
+		_funcMap(map, behaviors[i]);
+	}
+	return map;
 };
 
 ibelie.rpc.Entity.prototype.ByteSize = function() {
@@ -323,7 +353,7 @@ ibelie.rpc.Connection = function(url) {
 				var value = 0;
 				while (!buffer.End()) {
 					var symbol = buffer.ReadSymbol();
-					conn.Symbols = conn.Symbols.concat(symbol);
+					conn.Symbols.push(symbol);
 					conn.SymDict[symbol] = value;
 					value++;
 				}
@@ -373,16 +403,22 @@ ibelie.rpc.Connection = function(url) {
 					} else {
 						component[property] = newValue;
 					}
-					for (var b of entity.Behaviors) {
-						var c = b[compName];
-						var h = c && c[property];
-						h && h.apply(b, args);
+					var funcC = entity.Functions[compName];
+					var funcH = funcC && funcC[property];
+					if (funcH && funcH.length > 0) {
+						for (var i = 0, n = funcH.length; i < n; i++) {
+							var func = funcH[i];
+							func.apply(func, args);
+						}
 					}
 				} else {
 					var args = entity['D_' + name](data);
-					for (var b of entity.Behaviors) {
-						var m = b[name];
-						m && m.apply(b, args);
+					var funcs = entity.Functions[name];
+					if (funcs && funcs.length > 0) {
+						for (var i = 0, n = funcs.length; i < n; i++) {
+							var func = funcs[i];
+							func.apply(func, args);
+						}
 					}
 				}
 			}
