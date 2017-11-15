@@ -83,15 +83,15 @@ func injectJavascript(identName string, dir string, entities []*Entity, behavior
 				continue
 			}
 
-			m := tygo.JS_MODULE
-			if m == "" {
-				m = c.Protocol.Package
+			compModule := tygo.JS_MODULE
+			if compModule == "" {
+				compModule = c.Protocol.Package
 			}
-			m = strings.Replace(m, "/", ".", -1)
+			compModule = strings.Replace(compModule, "/", ".", -1)
 			requireMap[fmt.Sprintf(`
-goog.require('%s.%s');`, m, c.Name)] = true
+goog.require('%s.%s');`, compModule, c.Name)] = true
 			components = append(components, fmt.Sprintf(`
-			_this.%s = new %s.%s();`, c.Name, m, c.Name))
+			_this.%s = new %s.%s();`, c.Name, compModule, c.Name))
 
 			for _, m := range c.Protocol.Methods {
 				if ok, exist := methodsMap[m.Name]; exist && ok {
@@ -103,10 +103,10 @@ goog.require('%s.%s');`, m, c.Name)] = true
 				for i, _ := range m.Params {
 					params = append(params, fmt.Sprintf("a%d", i))
 				}
-				localParams := append([]string{"v"}, params...)
+				localParams := append([]string{"this"}, params...)
 				methods = append(methods, fmt.Sprintf(`
 Entity.prototype['D_%s'] = function(data) {
-	return ibelie.rpc['%s']['D_%sParam'](data);
+	return %s.%s['D_%sParam'](data);
 };
 
 Entity.prototype.%s = function(%s) {
@@ -114,16 +114,16 @@ Entity.prototype.%s = function(%s) {
 		console.warn('[Entity] Not awake:', this);
 		return;
 	}
-	for (var k in this) {
-		var v = this[k];
-		v.%s && v.%s.call(%s);
+	for (var b of this.Behaviors) {
+		var m = b['%s'];
+		m && m(%s);
 	}
-	var data = ibelie.rpc['%s']['S_%sParam'](%s);
-	this.connection.send(this, this.connection.SymDict.%s, data);
+	var data = %s.%s['S_%sParam'](%s);
+	this.connection.send(this, this.connection.SymDict['%s'], data);
 };
-`, m.Name, c.Name, m.Name, m.Name, strings.Join(params, ", "),
-					m.Name, m.Name, strings.Join(localParams, ", "),
-					c.Name, m.Name, strings.Join(params, ", "), m.Name))
+`, m.Name, compModule, c.Name, m.Name, m.Name, strings.Join(params, ", "),
+					m.Name, strings.Join(localParams, ", "),
+					compModule, c.Name, m.Name, strings.Join(params, ", "), m.Name))
 				methodsMap[m.Name] = true
 			}
 		}
@@ -256,7 +256,7 @@ ibelie.rpc.Entity.prototype.Awake = function(e) {
 	entity.Key = e.Key;
 	entity.Type = e.Type;
 	entity.connection = conn;
-	conn.send(e, conn.SymDict.OBSERVE);
+	conn.send(e, conn.SymDict['OBSERVE']);
 	conn.entities[entity.ID] = entity;
 	return entity;
 };
@@ -266,16 +266,10 @@ ibelie.rpc.Entity.prototype.Drop = function(e) {
 		console.warn('[Entity] Not awaked:', e);
 		return;
 	}
-	for (var k in e) {
-		var v = e[k];
-		v.onDrop && v.onDrop();
-		if (v.Entity) {
-			delete v.Entity;
-		}
-	}
+	e.onDrop && e.onDrop();
 	e.isAwake = false;
 	var conn = this.connection;
-	conn.send(e, conn.SymDict.IGNORE);
+	conn.send(e, conn.SymDict['IGNORE']);
 	delete conn.entities[e.ID];
 	var entity = new Entity();
 	entity.ID = e.ID;
@@ -361,10 +355,7 @@ ibelie.rpc.Connection = function(url) {
 			}
 			if (entity && !entity.isAwake) {
 				entity.isAwake = true;
-				for (var k in entity) {
-					var v = entity[k];
-					v.onAwake && v.onAwake();
-				}
+				entity.onAwake && entity.onAwake();
 			}
 		};
 		socket.onclose = function(event) {
