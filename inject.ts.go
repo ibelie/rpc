@@ -97,9 +97,9 @@ func Typescript(identName string, tsOut string, inputs []string) (entities []*En
 	}
 
 	types := resolveEntities(entities)
-	tygo.JS_EXTENS = map[string]string{"Entity": "ibelie.rpc"}
+	tygo.EXTENS_PKG = map[string]string{"Entity": "ibelie.rpc"}
 	tygo.Typescript(tsOut, "types", "", types, PROP_PRE)
-	tygo.JS_EXTENS = nil
+	tygo.EXTENS_PKG = nil
 	injectJavascript(identName, tsOut, entities)
 	injectTypescript(tsOut, entities, types)
 	return entities
