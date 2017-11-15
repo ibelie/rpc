@@ -165,7 +165,7 @@ ibelie.rpc.Entity.prototype.%s = function() {
 	var args = Array.prototype.concat.apply([this], arguments);
 	for (var b of this.Behaviors) {
 		var m = b['%s'];
-		m && m.apply(args);
+		m && m.apply(b, args);
 	}
 };
 `, m, m))
@@ -355,7 +355,7 @@ ibelie.rpc.Connection = function(url) {
 					var compName = conn.Symbols[buffer.ReadVarint()];
 					var property = conn.Symbols[buffer.ReadVarint()];
 					var component = entity[compName];
-					var newValue = component['D_' + property](buffer.Bytes())[0];
+					var newValue = component.constructor['D_' + property](buffer.Bytes())[0];
 					var oldValue = component[property];
 					var args = [component, oldValue, newValue];
 					if (oldValue.concat) {
@@ -376,13 +376,13 @@ ibelie.rpc.Connection = function(url) {
 					for (var b of entity.Behaviors) {
 						var c = b[compName];
 						var h = c && c[property];
-						h && h.apply(args);
+						h && h.apply(b, args);
 					}
 				} else {
 					var args = entity['D_' + name](data);
 					for (var b of entity.Behaviors) {
 						var m = b[name];
-						m && m.apply(args);
+						m && m.apply(b, args);
 					}
 				}
 			}
