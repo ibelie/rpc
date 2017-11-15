@@ -302,7 +302,7 @@ func entityRoutes(entities []*Entity) string {
 		}
 
 		bMethods := make(map[string]bool)
-		for _, b := range e.Behavior {
+		for _, b := range e.Behaviors {
 			for _, m := range b.Methods {
 				bMethods[m] = true
 			}

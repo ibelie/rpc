@@ -27,13 +27,13 @@ func Typescript(identName string, tsOut string, inputs []string) (entities []*En
 		components[o.Name] = &Component{Name: o.Name}
 	}
 
-	behaviors := make(map[string]*Behavior)
+	var behaviors []*Behavior
 	for _, o := range pkg.Objects {
 		if len(o.Parents) != 1 || o.Parents[0] == nil || o.Parents[0].Simple != "ibelie.rpc.Behavior" {
 			continue
 		}
 
-		behavior := &Behavior{Name: o.Name}
+		behavior := &Behavior{Name: o.Name, Module: o.Module}
 		for _, f := range o.Fields {
 			if f.Type == nil || !strings.HasSuffix(f.Type.Simple, "."+f.Name) {
 				continue
@@ -52,7 +52,7 @@ func Typescript(identName string, tsOut string, inputs []string) (entities []*En
 			behavior.Methods = append(behavior.Methods, m.Name)
 		}
 
-		behaviors[behavior.Name] = behavior
+		behaviors = append(behaviors, behavior)
 	}
 
 	for _, o := range pkg.Objects {
@@ -78,18 +78,21 @@ func Typescript(identName string, tsOut string, inputs []string) (entities []*En
 		for _, b := range behaviors {
 			hasBehavior := true
 			for _, bc := range b.Components {
+				hasComponent := false
 				for _, ec := range entity.Components {
-					if bc != ec {
-						hasBehavior = false
+					if bc == ec {
+						hasComponent = true
 						break
 					}
 				}
-				if !hasBehavior {
+				if !hasComponent {
+					hasBehavior = false
 					break
 				}
 			}
 			if hasBehavior {
-				entity.Behavior = append(entity.Behavior, b)
+				entity.Behaviors = append(entity.Behaviors, b)
+				b.Entities = append(b.Entities, entity.Name)
 			}
 		}
 
@@ -99,7 +102,7 @@ func Typescript(identName string, tsOut string, inputs []string) (entities []*En
 	types := resolveEntities(entities)
 	tygo.EXTENS_PKG = map[string]string{"Entity": "ibelie.rpc"}
 	tygo.Typescript(tsOut, "types", "", types, PROP_PRE)
-	injectJavascript(identName, tsOut, entities)
+	injectJavascript(identName, tsOut, entities, behaviors)
 	injectTypescript(tsOut, entities, types)
 	tygo.EXTENS_PKG = nil
 	return entities

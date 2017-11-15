@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"path"
 	"sort"
 	"strings"
@@ -67,7 +68,7 @@ var JSID_READ = []func(string) string{
 	},
 }
 
-func injectJavascript(identName string, dir string, entities []*Entity) {
+func injectJavascript(identName string, dir string, entities []*Entity, behaviors []*Behavior) {
 	ident := IDENT_FromString(identName)
 	var buffer bytes.Buffer
 	requireMap := make(map[string]bool)
@@ -127,16 +128,36 @@ Entity.prototype.%s = function(%s) {
 			}
 		}
 
+		var entBehaviors []string
+		for _, b := range e.Behaviors {
+			m := b.Name
+			if b.Module != "" {
+				m = b.Module + "." + b.Name
+			}
+			requireMap[fmt.Sprintf(`
+goog.require('%s');`, m)] = true
+			entBehaviors = append(entBehaviors, fmt.Sprintf(`
+			%s,`, m))
+		}
+		sort.Strings(entBehaviors)
+
 		entcodes = append(entcodes, fmt.Sprintf(`
-	'Session': (function (_super) {
-		__extends(Session, _super);
-		function Session() {
+	'%s': (function (_super) {
+		__extends(%s, _super);
+		function %s() {
 			var _this = _super.call(this) || this;%s
 			return _this;
 		}
-		__reflect(Session.prototype, "Session");
-		return Session;
-	}(ibelie.rpc.Entity)),`, strings.Join(components, "")))
+		%s.prototype.Behaviors = [%s
+		];
+		__reflect(%s.prototype, '%s');
+		return %s;
+	}(ibelie.rpc.Entity)),`, e.Name, e.Name, e.Name, strings.Join(components, ""),
+			e.Name, strings.Join(entBehaviors, ""), e.Name, e.Name, e.Name))
+	}
+
+	for _, b := range behaviors {
+		log.Println("behavior", b.Name, b.Entities)
 	}
 
 	var requires []string

@@ -41,13 +41,15 @@ type Component struct {
 
 type Behavior struct {
 	Name       string
+	Module     string
 	Methods    []string
+	Entities   []string
 	Components []*Component
 }
 
 type Entity struct {
 	Name       string
-	Behavior   []*Behavior
+	Behaviors  []*Behavior
 	Components []*Component
 }
 
