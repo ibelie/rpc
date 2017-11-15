@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"path"
 	"sort"
 	"strings"
@@ -164,9 +163,9 @@ ibelie.rpc.Entity.prototype.%s = function() {
 		console.warn('[Entity] Not awake:', this);
 		return;
 	}
-	var args = Array.prototype.concat.apply([this], arguments);
 	var funcs = this.Functions['%s'];
 	if (funcs && funcs.length > 0) {
+		var args = Array.prototype.concat.apply([this], arguments);
 		for (var i = 0, n = funcs.length; i < n; i++) {
 			var func = funcs[i];
 			func.apply(func, args);
@@ -200,8 +199,34 @@ goog.require('%s');`, behaviorModule)] = true
 			e.Name, strings.Join(entBehaviors, ""), e.Name, e.Name, e.Name, e.Name, e.Name))
 	}
 
+	var bMethods []string
+	bMethodsMap := make(map[string]bool)
 	for _, b := range behaviors {
-		log.Println("behavior", b.Name, b.Entities)
+		for _, m := range b.Methods {
+			if ok, exist := bMethodsMap[m]; exist && ok {
+				continue
+			}
+			bMethods = append(bMethods, fmt.Sprintf(`
+ibelie.rpc.Connection.prototype.%s = function() {
+	var entities = this.entities;
+	for (var i in entities) {
+		var entity = entities[i];
+		if (!entity.isAwake) {
+			continue;
+		}
+		var funcs = entity.Functions['%s'];
+		if (funcs && funcs.length > 0) {
+			var args = Array.prototype.concat.apply([entity], arguments);
+			for (var i = 0, n = funcs.length; i < n; i++) {
+				var func = funcs[i];
+				func.apply(func, args);
+			}
+		}
+	}
+};
+`, m, m))
+			bMethodsMap[m] = true
+		}
 	}
 
 	var requires []string
@@ -467,7 +492,7 @@ ibelie.rpc.Connection.prototype.send = function(entity, method, data) {
 ibelie.rpc.Connection.prototype.disconnect = function() {
 	this.socket.close();
 };
-%s
+%s%s
 ibelie.rpc.entities = {%s
 };
 `, strings.Join(requires, ""),
@@ -477,7 +502,8 @@ ibelie.rpc.entities = {%s
 		JSID_READ[ident]("protobuf"), JSID_READ[ident]("protobuf"),
 		JSID_BYTESIZE[ident]("this.ID"), JSID_BYTESIZE[ident]("this.Key"),
 		JSID_WRITE[ident]("protobuf", "entity.ID"), JSID_WRITE[ident]("protobuf", "entity.Key"),
-		strings.Join(methods, ""), strings.Join(entcodes, ""))))
+		strings.Join(bMethods, ""), strings.Join(methods, ""),
+		strings.Join(entcodes, ""))))
 
 	ioutil.WriteFile(path.Join(dir, "rpc.js"), buffer.Bytes(), 0666)
 }
