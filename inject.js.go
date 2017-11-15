@@ -387,7 +387,7 @@ ibelie.rpc.Connection = function(url) {
 					var component = entity[compName];
 					var newValue = component.constructor['D_' + property](buffer.Bytes())[0];
 					var oldValue = component[property];
-					var args = [component, oldValue, newValue];
+					var args = [entity, oldValue, newValue];
 					if (oldValue.concat) {
 						component[property] = oldValue.concat(newValue);
 					} else if ((newValue instanceof Object) && !newValue.__class__) {
@@ -398,7 +398,7 @@ ibelie.rpc.Connection = function(url) {
 							var o = oldValue[k];
 							var n = newValue[k];
 							oldValue[k] = n;
-							args = [component, k, o, n];
+							args = [entity, k, o, n];
 						}
 					} else {
 						component[property] = newValue;
