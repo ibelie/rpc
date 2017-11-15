@@ -130,14 +130,35 @@ Entity.prototype.%s = function(%s) {
 
 		var entBehaviors []string
 		for _, b := range e.Behaviors {
-			m := b.Name
+			behaviorModule := b.Name
 			if b.Module != "" {
-				m = b.Module + "." + b.Name
+				behaviorModule = b.Module + "." + b.Name
 			}
+
+			for _, m := range b.Methods {
+				if ok, exist := methodsMap[m]; exist && ok {
+					continue
+				}
+				methods = append(methods, fmt.Sprintf(`
+Entity.prototype.%s = function() {
+	if (!this.isAwake) {
+		console.warn('[Entity] Not awake:', this);
+		return;
+	}
+	var args = Array.prototype.concat.apply([this], arguments);
+	for (var b of this.Behaviors) {
+		var m = b['%s'];
+		m && m.apply(args);
+	}
+};
+`, m, m))
+				methodsMap[m] = true
+			}
+
 			requireMap[fmt.Sprintf(`
-goog.require('%s');`, m)] = true
+goog.require('%s');`, behaviorModule)] = true
 			entBehaviors = append(entBehaviors, fmt.Sprintf(`
-			%s,`, m))
+			%s,`, behaviorModule))
 		}
 		sort.Strings(entBehaviors)
 
