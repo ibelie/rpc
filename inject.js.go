@@ -363,7 +363,7 @@ ibelie.rpc.Entity.prototype.Drop = function(e) {
 	return entity;
 };
 
-ibelie.rpc.Connection = function(url) {
+ibelie.rpc.Connection = function(url, global) {
 	var conn = this;
 	var socket = new WebSocket(url);
 	socket.onopen = function (event) {
@@ -456,6 +456,7 @@ ibelie.rpc.Connection = function(url) {
 			console.warn('[Connection] Socket has been closed:', event, conn);
 		};
 	};
+	this.global = global;
 	this.socket = socket;
 	this.entities = {};
 };
