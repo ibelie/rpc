@@ -44,7 +44,6 @@ func IDENT_FromString(name string) int {
 }
 
 var ENTITY_PKG = map[string]string{
-	"fmt": "",
 	"github.com/ibelie/rpc":  "",
 	"github.com/ibelie/ruid": "",
 	"github.com/ibelie/tygo": "",
