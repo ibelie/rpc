@@ -171,7 +171,7 @@ func (c *Component) isService() bool {
 func packageDoc(path string) *doc.Package {
 	p, err := build.Import(path, "", build.ImportComment)
 	if err != nil {
-		log.Printf("[RPC][Inject] packageDoc import error: %v", err)
+		log.Printf("[RPC][Inject] Package doc import error: %v", err)
 		return nil
 	}
 	fs := token.NewFileSet()
@@ -185,7 +185,7 @@ func packageDoc(path string) *doc.Package {
 	}
 
 	if pkgs, err := parser.ParseDir(fs, p.Dir, include, parser.ParseComments); err != nil || len(pkgs) != 1 {
-		log.Printf("[RPC][Inject] packageDoc parse dir error: %v", err)
+		log.Printf("[RPC][Inject] Package doc parse dir error: %v", err)
 		return nil
 	} else {
 		return doc.New(pkgs[p.Name], p.ImportPath, doc.AllDecls)
