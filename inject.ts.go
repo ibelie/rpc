@@ -157,6 +157,7 @@ declare module ibelie.rpc {
 	interface Entity {
 		__class__: string;
 		isAwake: boolean;
+		connection: Connection;
 		Awake(entity: Entity): any;
 		Drop(entity: Entity): any;
 		ByteSize(): number;
