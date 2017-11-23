@@ -356,7 +356,7 @@ ibelie.rpc.Entity.prototype.Drop = function(e) {
 	var conn = this.connection;
 	conn.send(e, conn.SymDict['IGNORE']);
 	delete conn.entities[e.ID];
-	var entity = new Entity();
+	var entity = new ibelie.rpc.Entity();
 	entity.ID = e.ID;
 	entity.Key = e.Key;
 	entity.Type = e.Type;
