@@ -148,6 +148,9 @@ func (e *Entity) Deserialize(input *tygo.ProtoBuf) (err error) {
 )
 
 func Go(dir string, types []tygo.Type) {
+	if len(types) <= 0 {
+		return
+	}
 	pkgname, depends := Extract(dir)
 	var head bytes.Buffer
 	var body bytes.Buffer
