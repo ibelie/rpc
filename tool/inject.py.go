@@ -6,6 +6,7 @@ package main
 
 import (
 	"flag"
+
 	"github.com/ibelie/rpc"
 )
 
@@ -16,6 +17,5 @@ func main() {
 	goOut := flag.String("go", "", "output golang dir")
 	ignore := flag.String("ig", "", "ignore python modules")
 	flag.Parse()
-	entities := rpc.Python(*ident, *input, *pyOut, append(flag.Args(), *ignore))
-	rpc.Proxy(*ident, *goOut, entities)
+	rpc.Python(*ident, *input, *pyOut, *goOut, append(flag.Args(), *ignore))
 }
