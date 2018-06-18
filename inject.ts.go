@@ -155,7 +155,7 @@ func injectTypescript(dir string, entities []*Entity, types []tygo.Type, behavio
 
 declare module ibelie.rpc {
 	interface Entity {
-		__class__: string;
+		isObject: true;
 		ID: string;
 		Key: string;
 		Type: string;

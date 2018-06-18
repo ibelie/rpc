@@ -78,7 +78,7 @@ goog.provide('ibelie.rpc.ZERO_ID');
 ibelie.rpc.ZERO_ID = %q;
 
 ibelie.rpc.Entity = function() {
-	this.__class__ = 'Entity';
+	this.isObject = true;
 	this.isAwake = false;
 	this.ID = ibelie.rpc.ZERO_ID;
 	this.Key = ibelie.rpc.ZERO_ID;
@@ -415,7 +415,7 @@ ibelie.rpc.Connection = function(url, global) {
 					var args = [entity, oldValue, newValue];
 					if (oldValue.concat) {
 						component[property] = oldValue.concat(newValue);
-					} else if ((newValue instanceof Object) && !newValue.__class__) {
+					} else if ((newValue instanceof Object) && !newValue.isObject) {
 						if (!component[property]) {
 							component[property] = {};
 						}
