@@ -33,7 +33,7 @@ func GateService(_ Server) (string, Service) {
 	return SYMBOL_GATE, &GateInst
 }
 
-func Gate(address string, session string, symbols []string, network Network) {
+func Gate(address string, session string, version [16]byte, symbols []string, network Network) {
 	SYMBOL_SESSION = session
 	serverID := server.ServerID()
 	CREATE_SESSION = make([]byte, 1+tygo.SymbolEncodedLen(SYMBOL_SESSION)+serverID.ByteSize())
@@ -42,20 +42,14 @@ func Gate(address string, session string, symbols []string, network Network) {
 	serverID.Serialize(output)
 	output.EncodeSymbol(SYMBOL_SESSION)
 
-	size := 0
 	GATE_SYMBOLS = symbols
 	for i, symbol := range GATE_SYMBOLS {
-		size += tygo.SizeSymbol(symbol)
 		GATE_SYMDICT[symbol] = uint64(i)
 	}
 	sessionType := GATE_SYMDICT[SYMBOL_SESSION]
-	HANDSHAKE_DATA = make([]byte, tygo.SizeVarint(uint64(size))+size+
-		serverID.ByteSize()+tygo.SizeVarint(sessionType))
+	HANDSHAKE_DATA = make([]byte, len(version)+serverID.ByteSize()+tygo.SizeVarint(sessionType))
 	output = &tygo.ProtoBuf{Buffer: HANDSHAKE_DATA}
-	output.WriteVarint(uint64(size))
-	for _, symbol := range GATE_SYMBOLS {
-		output.WriteSymbol(symbol)
-	}
+	output.Write(version[:])
 	serverID.Serialize(output)
 	output.WriteVarint(sessionType)
 

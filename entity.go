@@ -10,8 +10,10 @@ import (
 	"log"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 
+	"crypto/md5"
 	"io/ioutil"
 
 	"github.com/ibelie/tygo"
@@ -383,26 +385,35 @@ func entitySymbols(symbols []string) (string, string) {
 	}
 	sort.Strings(symbolSorted)
 
+	var version = md5.New()
 	var symbolConst []string
 	var symbolValue []string
 	for _, s := range BUILTIN_SYMBOLS {
+		version.Write([]byte(s))
 		symbolConst = append(symbolConst, fmt.Sprintf(`
 	SYMBOL_%s %s= %q`, s, strings.Repeat(" ", maxSymbol-len(s)), s))
 		symbolValue = append(symbolValue, fmt.Sprintf(`
 	SYMBOL_%s,`, s))
 	}
 	for _, s := range symbolSorted {
+		version.Write([]byte(s))
 		symbolConst = append(symbolConst, fmt.Sprintf(`
 	SYMBOL_%s %s= %q`, s, strings.Repeat(" ", maxSymbol-len(s)), s))
 		symbolValue = append(symbolValue, fmt.Sprintf(`
 	SYMBOL_%s,`, s))
 	}
 
+	var versionBytes []string
+	for _, v := range version.Sum(nil) {
+		versionBytes = append(versionBytes, strconv.Itoa(int(v)))
+	}
+
 	return fmt.Sprintf(`
 const (%s
 )`, strings.Join(symbolConst, "")), fmt.Sprintf(`
+var Version = [16]byte{%s}
 var Symbols = []string{%s
-}`, strings.Join(symbolValue, ""))
+}`, strings.Join(versionBytes, ", "), strings.Join(symbolValue, ""))
 }
 
 func entityDistribute(service *tygo.Object, method *tygo.Method) (string, map[string]string) {
