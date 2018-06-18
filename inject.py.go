@@ -82,20 +82,24 @@ func Python(identName string, input string, pyOut string, goOut string, ignore [
 	types = append(types, methods...)
 
 	symbol_s, symbol_b := entityProxy(identName, goOut, entities)
+	var versionBytes []string
+	for _, v := range symbol_b {
+		versionBytes = append(versionBytes, fmt.Sprintf("\\x%02x", v))
+	}
 
 	var buffer bytes.Buffer
 	buffer.Write([]byte(PY_HEADER))
 	buffer.Write([]byte(fmt.Sprintf(`
 IDType = '%s'
 
-Version = '\x%s'
+Version = '%s'
 
 Symbols = [
 	'%s',
 ]
 
 from microserver.classes import Entity
-`, identName, strings.Join(symbol_b, "\\x"), strings.Join(symbol_s, `',
+`, identName, strings.Join(versionBytes, ""), strings.Join(symbol_s, `',
 	'`))))
 	buffer.Write(tygo.Python(types))
 	ioutil.WriteFile(path.Join(pyOut, "proto.py"), buffer.Bytes(), 0666)
