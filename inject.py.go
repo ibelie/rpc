@@ -99,8 +99,7 @@ Symbols = [
 ]
 
 from microserver.classes import Entity
-`, identName, strings.Join(versionBytes, ""), strings.Join(symbol_s, `',
-	'`))))
+`, identName, strings.Join(versionBytes, ""), strings.Join(symbol_s, "',\n\t'"))))
 	buffer.Write(tygo.Python(types))
 	ioutil.WriteFile(path.Join(pyOut, "proto.py"), buffer.Bytes(), 0666)
 
