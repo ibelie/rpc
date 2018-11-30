@@ -56,7 +56,7 @@ function Extract(fileNames, options) {
 				var method = {
 					Name: k,
 					Params: t.getCallSignatures()[0].parameters.map(function (x) { return type(checker.getTypeOfSymbolAtLocation(x, x.valueDeclaration), x.valueDeclaration); }),
-					Document: ts.displayPartsToString(v.getDocumentationComment())
+					Document: ts.displayPartsToString(v.getDocumentationComment(checker))
 				};
 				var result = type(t.getCallSignatures()[0].getReturnType());
 				if (result.Simple != "void") {
@@ -67,7 +67,7 @@ function Extract(fileNames, options) {
 				object.Fields.push({
 					Name: k,
 					Type: type(t, v.valueDeclaration),
-					Document: ts.displayPartsToString(v.getDocumentationComment())
+					Document: ts.displayPartsToString(v.getDocumentationComment(checker))
 				});
 			}
 		});
